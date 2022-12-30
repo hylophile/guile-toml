@@ -24,7 +24,7 @@ HEXDIG <- DIGIT / [A-Fa-f]
   "t-newline < '\n' / '\r\n'")
 
 (define-peg-string-patterns
-  "toml <- t-expression (t-newline t-expression)*
+  "toml <- (t-expression t-newline)* t-expression
 t-expression <- ((ws keyval ws) / (ws table ws) / ws) comment?
 ")
 
@@ -50,7 +50,7 @@ comment < comment-start-symbol non-eol*
 ;; Key-Value pairs
 
 (define-peg-string-patterns
-  "keyval <- key keyval-sep val
+  "keyval <-- key keyval-sep val
 key <- dotted-key / simple-key
 simple-key <-- quoted-key / unquoted-key
 
@@ -115,7 +115,7 @@ escape <- '\\'
 
 ;; Multiline Basic String
 (define-peg-string-patterns
-  "ml-basic-string <-- ml-basic-string-delim t-newline? ml-basic-body ml-basic-string-delim
+  "ml-basic-string <- ml-basic-string-delim t-newline? ml-basic-body ml-basic-string-delim
 ml-basic-string-delim <- quotation-mark quotation-mark quotation-mark
 ml-basic-body <- mlb-content* (mlb-quotes mlb-content+)* mlb-quotes?
 
@@ -243,13 +243,14 @@ full-time      <- partial-time time-offset
   "local-time <-- partial-time
 ")
 ;; Array
+;; array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
 (define-peg-string-patterns
   "array <-- array-open array-values? ws-comment-t-newline array-close
 
 array-open < '['
 array-close < ']'
 
-array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
+array-values <- (ws-comment-t-newline val ws-comment-t-newline array-sep)* ws-comment-t-newline val ws-comment-t-newline array-sep?
 
 array-sep < ','
 
@@ -286,9 +287,51 @@ array-table-close < ws ']]'
 
 
 (define x (match-pattern toml t))
-(pretty-print (peg:tree x))
+;; (pretty-print (keyword-flatten '(simple-key array keyval std-table) (peg:tree x)))
 
-(display "\n\n")
+;; (display "\n\n")
+
+;; (display (peg:tree x))
+(define x (keyword-flatten '(simple-key array keyval std-table) (peg:tree x)))
 
 
-(pretty-print (peg:substring x))
+(define (get-keys l)
+  (map cadr (keyword-flatten '(simple-key) l)))
+
+(define (keys->string l)
+  (string-join (get-keys l) "."))
+
+(define (get-values l)
+  (match l
+    (('array vs ...) (keyword-flatten '(dec-int float string bola) l))
+    ((_ x) x)))
+
+(get-values '(array (a b)))
+
+(define (values->string l)
+  (match (car l)
+    (('array vs ...) vs)
+    (x (cadr x))))
+
+(define (value->string v)
+  (cdr v))
+
+(define (a)
+  (let loop ((tree x))
+    (match (car tree)
+      (('keyval keys values ...)
+       (format #t "~a = ~S\n" (keys->string keys) (values->string values)))
+      (('std-table keys ...)
+       (format #t "[~a]\n" (keys->string keys)))
+      ((x ...) (display x)))
+
+    (unless (null? (cdr tree))
+      (loop (cdr tree)))))
+
+
+(a)
+
+;; (display (scm->json (peg:tree x)))
+;; (pretty-print (peg:substring x))
+(keyword-flatten '(simple-key) '((simple-key hosts) ((simple-key l) (simple-key ol))))
+(keyword-flatten '(simple-key) '(simple-key hosts))
