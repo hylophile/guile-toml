@@ -275,8 +275,9 @@ std-table-close < ws ']'
 ")
 ;; Inline Table
 (define-peg-string-patterns
-  "inline-table <-- inline-table-open inline-table-keyvals? inline-table-close
+  "inline-table <-- inline-table-open (inline-table-keyvals / empty) inline-table-close
 
+empty <- ''
 inline-table-open  < '{' ws
 inline-table-close < ws '}'
 inline-table-sep   < ws ',' ws
@@ -293,13 +294,14 @@ array-table-close < ws ']]'
 
 
 (define (parse str)
-  (define record (keyword-flatten
-                  '(array keyval std-table inline-table)
-                  (match-pattern toml str)))
-  (if (eq? (string-length str) (peg:end record))
+  ;; (define record (keyword-flatten
+  ;;                 '(keyval std-table inline-table)
+  ;;                 (match-pattern toml str)))
+  (define peg (match-pattern toml str))
+  (if (eq? (string-length str) (peg:end peg))
       (begin
         ;; (pretty-print (peg:tree record))
-        (peg:tree record))
+        (peg:tree peg))
       (begin
-        (pretty-print (peg:tree record))
-        (error "guile-toml: parsing failed\n" (peg:substring record)))))
+        (pretty-print (peg:tree peg))
+        (error "guile-toml: parsing failed\n" (peg:substring peg)))))

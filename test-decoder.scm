@@ -25,7 +25,10 @@
       (('time-local v)
        (validate-date-time `(time-local ,v))
        `(("value" . ,v) ("type" . "time-local")))
-
+      (('inline-table "")
+       '())
+      (('inline-table xs ...)
+       (peg-tree->scm (flatten-tree xs)))
       ((x y)
        `(("value" . ,y) ("type" . ,(symbol->string x))))
       ('()

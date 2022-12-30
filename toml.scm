@@ -9,7 +9,7 @@
   #:use-module (json)
   #:use-module (srfi srfi-1)
   ;; TODO exporting flatten-array isn't nice, it's an internal function.
-  #:export (toml->scm flatten-array value->scm validate-date-time read-string read-int value?))
+  #:export (toml->scm peg-tree->scm flatten-tree flatten-array value->scm validate-date-time read-string read-int value?))
 
 
 (define-syntax-rule (log-exprs exp ...) (begin (format #t "~a: ~S\n" (quote exp) exp) ...))
@@ -54,8 +54,13 @@
 (define value->scm
   (make-parameter
    (lambda (value-pair)
+     (log-exprs value-pair)
      (match value-pair
        (('array value-pairs ...)
+        ;; (log-exprs value-pairs (flatten-array value-pairs))
+        ;; (pretty-print value-pairs)
+        ;; (newline)
+        ;; (pretty-print (flatten-array value-pairs))
         (list->vector (map (value->scm) (flatten-array value-pairs))))
        (('integer v)
         (read-int v))
@@ -84,6 +89,10 @@
        (('time-local v)
         (validate-date-time `(time-local ,v))
         (time-local->date v))
+       (('inline-table "")
+        '())
+       (('inline-table xs ...)
+        (peg-tree->scm xs))
        ((x y)
         (format #f "~a: ~a" x y))
        ('()
@@ -343,6 +352,13 @@
 ;; need to refactor parsing somehow to treat recursive array / inline-table definitions
 (define (toml->scm s)
   (define tree (parse s))
+  (peg-tree->scm (flatten-tree tree)))
+
+(define (flatten-tree tree)
+  (keyword-flatten '(keyval array-table std-table inline-table) tree))
+
+(define (peg-tree->scm tree)
+  ;; (pretty-print tree)
   (let loop ((tree (if (symbol? (car tree)) (list tree) tree))
              (result '())
              (current-table '())
@@ -354,28 +370,26 @@
     ;; (pretty-print result)
     ;; (newline)
     (match (car tree)
-      (('keyval keys 'inline-table)
-       (let ((keylist (append current-table (get-keys keys))))
-         (when (find-key result keylist)
-           (error "guile-toml: redefinition not allowed"))
-         (set! inline-table-keys (cons keylist inline-table-keys))
-         (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
+      ;; (('keyval keys 'inline-table)
+      ;;  (let ((keylist (append current-table (get-keys keys))))
+      ;;    (set! inline-table-keys (cons keylist inline-table-keys))
+      ;;    (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
 
-      (('keyval keys ('inline-table keyvals ...))
-       (let* ((keylist (append current-table (get-keys keys)))
-              (keylist-all-but-last (all-keys-but-last keylist)))
-         (when (not (eq? 1 (length (get-keys keys))))
-           (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
-           (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys)))
-         (set! result
-               (loop (keyword-flatten '(keyval) keyvals)
-                     result
-                     keylist
-                     '()
-                     '()
-                     '()
-                     '()
-                     array-table-index))))
+      ;; (('keyval keys ('inline-table keyvals ...))
+      ;;  (let* ((keylist (append current-table (get-keys keys)))
+      ;;         (keylist-all-but-last (all-keys-but-last keylist)))
+      ;;    (when (not (eq? 1 (length (get-keys keys))))
+      ;;      (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
+      ;;      (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys)))
+      ;;    (set! result
+      ;;          (loop (keyword-flatten '(keyval) keyvals)
+      ;;                result
+      ;;                keylist
+      ;;                '()
+      ;;                '()
+      ;;                '()
+      ;;                '()
+      ;;                array-table-index))))
 
       (('keyval ('simple-key value)) ;; special case for key being empty string
        (let* ((keylist (append current-table '(""))))
@@ -390,6 +404,8 @@
            ;; (log-exprs explicit-table-keys keylist-all-but-last)
            (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
            (set! new-explicit-table-keys (cons keylist-all-but-last new-explicit-table-keys)))
+         ;; (when (find-key result keylist)
+         ;;   (error "guile-toml: redefinition not allowed"))
          (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
 
       (('std-table keys ...)
@@ -424,7 +440,7 @@
 
 
 
-      (x (format #t "~a ; unknown: ~a\n" tree x)))
+      (x (error x)))
 
     (if (null? (cdr tree))
         result
