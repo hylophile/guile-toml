@@ -19,10 +19,13 @@
 DIGIT <- [0-9]
 HEXDIG <- DIGIT / 'A' / 'B' / 'C' / 'D' / 'E' / 'F'
 ")
+;; T-Newline
+(define-peg-string-patterns
+  "t-newline < '\n' / '\r\n'")
 
 (define-peg-string-patterns
-  "toml <- expression (newline expression)*
-expression <- ((ws keyval ws) / (ws table ws) / ws) comment?
+  "toml <- t-expression (t-newline t-expression)*
+t-expression <- ((ws keyval ws) / (ws table ws) / ws) comment?
 ")
 
 ;; Whitespace
@@ -30,9 +33,6 @@ expression <- ((ws keyval ws) / (ws table ws) / ws) comment?
   "ws < wschar*
 wschar < ' ' / '\t'
 ")
-;; Newline
-(define-peg-string-patterns
-  "newline < '\n' / '\r\n'")
 ;; Comment
 ;; non-ascii <- %x80-D7FF / %xE000-10FFFF
 ;; non-eol <- %x09 / %x20-7F / non-ascii
@@ -51,8 +51,8 @@ comment <-- comment-start-symbol non-eol*
 
 (define-peg-string-patterns
   "keyval <- key keyval-sep val
-key <-- simple-key / dotted-key
-simple-key <- quoted-key / unquoted-key
+key <- dotted-key / simple-key
+simple-key <-- quoted-key / unquoted-key
 
 unquoted-key <- (ALPHA / DIGIT / '-' / '_')+
 quoted-key <- basic-string / literal-string
@@ -62,7 +62,7 @@ dot-sep   <- ws dot ws
 dot < '.'
 keyval-sep <- ws eq ws
 eq < '='
-val <-- string / boolean / array / inline-table / date-time / float / integer
+val <- string / boolean / array / inline-table / date-time / float / integer
 
 ")
 ;; String
@@ -80,9 +80,9 @@ basic-char <- basic-unescaped / escaped
 
 ;; basic-unescaped <- wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 (define-peg-pattern basic-unescaped body
-  (or wschar "!" (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
+  (or wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
 (define-peg-string-patterns
-  "escaped <- escape escape-seq-char
+  "escaped <-- escape escape-seq-char
 
 escape <- '\\'
 ")
@@ -115,19 +115,23 @@ escape <- '\\'
 
 ;; Multiline Basic String
 (define-peg-string-patterns
-  "ml-basic-string <- ml-basic-string-delim newline? ml-basic-body
-ml-basic-string-delim
+  "ml-basic-string <-- ml-basic-string-delim t-newline? ml-basic-body ml-basic-string-delim
 ml-basic-string-delim <- quotation-mark quotation-mark quotation-mark
 ml-basic-body <- mlb-content* (mlb-quotes mlb-content+)* mlb-quotes?
 
-mlb-content <- mlb-char / newline / mlb-escaped-nl
+body-newline <- '\n' / '\r\n'
+body-ws <- body-wschar*
+body-wschar <- ' ' / '\t'
+body-quot <- '\"'
+
+mlb-content <- mlb-escaped-nl / mlb-char / body-newline
 mlb-char <- mlb-unescaped / escaped
-mlb-quotes <- quotation-mark quotation-mark?
-mlb-escaped-nl <- escape ws newline (wschar / newline)*
+mlb-quotes <- !ml-basic-string-delim body-quot body-quot?
+mlb-escaped-nl < escape ws body-newline (wschar / body-newline)*
 ")
 ;; mlb-unescaped <- wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 (define-peg-pattern mlb-unescaped body
-  (or wschar "!" (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
+  (or body-wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
 
 ;; Literal String
 (define-peg-string-patterns
@@ -136,20 +140,20 @@ mlb-escaped-nl <- escape ws newline (wschar / newline)*
 
 ;; apostrophe <- '\x27' ; apostrophe
 ;; literal-char <- %x09 / %x20-26 / %x28-7E / non-ascii
-(define-peg-pattern apostrophe body "'")
+(define-peg-pattern apostrophe none "'")
+(define-peg-pattern body-apostrophe body "'")
 (define-peg-pattern literal-char body
   (or "\t" (range #\x20 #\x26) (range #\x28 #\x7E) non-ascii))
 
 ;; Multiline Literal String
 (define-peg-string-patterns
-  "ml-literal-string <- ml-literal-string-delim newline? ml-literal-body
-ml-literal-string-delim
+  "mll-quotes <- !ml-literal-string-delim body-apostrophe body-apostrophe?
+
+ml-literal-string <- ml-literal-string-delim t-newline? ml-literal-body ml-literal-string-delim
 ml-literal-string-delim <- apostrophe apostrophe apostrophe
 ml-literal-body <- mll-content* (mll-quotes mll-content+ )* mll-quotes?
 
-mll-content <- mll-char / newline
-mll-char <- %x09 / %x20-26 / %x28-7E / non-ascii
-mll-quotes <- apostrophe apostrophe?
+mll-content <- mll-char / body-newline
 ")
 
 (define-peg-pattern mll-char body
@@ -160,7 +164,7 @@ mll-quotes <- apostrophe apostrophe?
 
 minus <- '-'
 plus <- '+'
-underscore <- '_'
+underscore < '_'
 digit1-9 <- [1-9]
 digit0-7 <- [0-9]
 digit0-1 <- [0-1]
@@ -169,32 +173,33 @@ hex-prefix <- '0x'
 oct-prefix <- '0o'
 bin-prefix <- '0b'
 
-dec-int <- (minus / plus)? unsigned-dec-int
-unsigned-dec-int <- DIGIT / (digit1-9 ( DIGIT / (underscore DIGIT))+)
+dec-int <-- (minus / plus)? unsigned-dec-int
+unsigned-dec-int <- (digit1-9 ( DIGIT / (underscore DIGIT))+) / DIGIT
 
-hex-int <- hex-prefix HEXDIG (HEXDIG / underscore HEXDIG)*
-oct-int <- oct-prefix digit0-7 (digit0-7 / underscore digit0-7)*
-bin-int <- bin-prefix digit0-1 (digit0-1 / underscore digit0-1)*
+hex-int <-- hex-prefix HEXDIG (HEXDIG / underscore HEXDIG)*
+oct-int <-- oct-prefix digit0-7 (digit0-7 / underscore digit0-7)*
+bin-int <-- bin-prefix digit0-1 (digit0-1 / underscore digit0-1)*
 ")
 ;; Float
 (define-peg-string-patterns
-  "float <- (float-int-part ( exp / frac exp?)) / special-float
+  "float <-- (float-int-part ( t-exp / frac t-exp?)) / special-float
 
-float-int-part <- dec-int
+float-dec-int <- (minus / plus)? unsigned-dec-int
+float-int-part <- float-dec-int
 frac <- decimal-point zero-prefixable-int
 decimal-point <- '.'
 zero-prefixable-int <- DIGIT (DIGIT / underscore DIGIT)*
 
-exp <- 'e' float-exp-part
-float-exp-part <- (minus / plus)? zero-prefixable-int
+t-exp <- 'e' float-t-exp-part
+float-t-exp-part <- (minus / plus)? zero-prefixable-int
 
-special-float <- (minus / plus)? ( inf / nan)
-inf <- 'inf'
-nan <- 'nan'
+special-float <- (minus / plus)? ( t-inf / t-nan)
+t-inf <- 't-inf'
+t-nan <- 't-nan'
 ")
 ;; Boolean
 (define-peg-string-patterns
-  "boolean <- 'true' / 'false'
+  "boolean <-- 'true' / 'false'
 
 ")
 ;; true    <- %x74.72.75.65     ; true
@@ -223,32 +228,32 @@ full-time      <- partial-time time-offset
 
 ;; Offset Date-Time
 (define-peg-string-patterns
-  "offset-date-time <- full-date time-delim full-time
+  "offset-date-time <-- full-date time-delim full-time
 ")
 ;; Local Date-Time
 (define-peg-string-patterns
-  "local-date-time <- full-date time-delim partial-time
+  "local-date-time <-- full-date time-delim partial-time
 ")
 ;; Local Date
 (define-peg-string-patterns
-  "local-date <- full-date
+  "local-date <-- full-date
 ")
 ;; Local Time
 (define-peg-string-patterns
-  "local-time <- partial-time
+  "local-time <-- partial-time
 ")
 ;; Array
 (define-peg-string-patterns
-  "array <-- array-open array-values? ws-comment-newline array-close
+  "array <-- array-open array-values? ws-comment-t-newline array-close
 
 array-open < '['
 array-close < ']'
 
-array-values <- ws-comment-newline val ws-comment-newline ((array-sep array-values) / array-sep?)
+array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
 
-array-sep <- ','
+array-sep < ','
 
-ws-comment-newline <- (wschar / (comment? newline))*
+ws-comment-t-newline <- ((comment? t-newline) / wschar)*
 ")
 ;; Table
 (define-peg-string-patterns

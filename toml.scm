@@ -52,15 +52,17 @@ NL < '\n'")
 
 ;; (parse "x = [ 8000, 8002 ]")
 
-;; (define-peg-string-patterns "yyy <- [a-z]")
+(define-peg-string-patterns
+  "xxx <- [a-z]
+")
 
-(define-peg-pattern rrr all (range #\x20 #\x80))
+(define-peg-pattern rrr all (range #\x20 #\x20))
 
-(search-for-pattern "'a'" "a ")
+(search-for-pattern "#\x27" "'abc ")
 
 (pretty-print (parse t))
 
-(peg:tree (match-pattern rrr "  "))
+(peg:tree (match-pattern rrr " \nien"))
 
 ;; (pretty-print (peg:substring (match-pattern toml t)))
 ;; (display t)

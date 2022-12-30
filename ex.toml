@@ -1,8 +1,9 @@
+str0="""a"""
 # This is a TOML document.
 
 
 
-a=3
+a = [ 2_000, 2, 2, 2.03 ]
 title = "TOML Example" # lol
 
 [owner]
@@ -34,3 +35,26 @@ hosts = [
   "alpha",
   "omega"
 ]
+
+str0="""a"""
+str1 = """
+Roses are red
+Violets are blue"""
+
+str2 = """\
+  The quick brown \
+  fox jumps over \
+  the lazy dog.\
+  """
+
+path = 'C:\Users\nodejs\templates'
+path2 = '\\User\admin$\system32'
+quoted = 'Tom "Dubs" Preston-Werner'
+regex = '<\i\c*\s*>'
+re = '''\d{2} apps is t[wo]o many'''
+lines = '''
+The first newline is
+trimmed in raw strings.
+All other whitespace
+is preserved.
+'''
