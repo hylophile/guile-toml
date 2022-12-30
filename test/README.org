@@ -1,0 +1,24 @@
+#+title: guile-toml tests
+
+
+* toml-test suite
+
+To run the ~toml-test~ suite, install ~toml-test~ by following the instructions [[https://github.com/BurntSushi/toml-test/#installation][here]]. Running the tests also depends on [[https://github.com/aconchillo/guile-json][guile-json]], so make sure to have it installed.
+
+To test the decoder, run:
+#+begin_src shell
+$ toml-test ./test-decoder.scm
+#+end_src
+
+To test the encoder, run:
+#+begin_src shell
+$ toml-test -encoder ./test-encoder.scm
+#+end_src
+
+* tests for Guile's datatypes
+
+The ~toml-test~ suite tests TOML's structure extensively, but since it relies on JSON and a different encoding of values, we still need to test whether Guile's datatypes are decoded and encoded correctly.
+
+[TODO]
+
+The files ~decoder.scm~ and ~encoder.scm~ serve as examples for this. They take input from STDIN and output to STDOUT.
