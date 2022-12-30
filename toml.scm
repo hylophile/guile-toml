@@ -99,8 +99,8 @@
 (define (keyval->scm keys value array-table-index)
   (let loop ((keys keys))
     (cond
-     ((and array-table-index (eq? 2 (length keys)))
-      (cons (first keys) (list->vector (list (list (cons (second keys) ((value->scm) (car value))))))))
+     ;; ((and array-table-index (eq? 2 (length keys)))
+     ;;  (cons (first keys) (list->vector (list (list (cons (second keys) ((value->scm) (car value))))))))
 
      ((null? (cdr keys))
       (cons (car keys) ((value->scm) (car value))))
@@ -112,37 +112,76 @@
   (make-parameter
    (lambda (expr) (not (list? expr)))))
 
-(define (add-to-tree tree keys value array-table-index)
+(define (find-subtree tree keys)
+  (cond ((null? keys) #f)
+        (else (let ((k (list-index (lambda (x) (equal? x (car keys)))
+                                   (map car tree))))
+                (and k (list-ref tree k))))))
+
+
+(define (add-to-tree tree table-keys keys value array-table-index)
+  (if array-table-index
+      (add-kv-to-tree-in-array tree table-keys keys value array-table-index)
+      (add-kv-to-tree tree (append table-keys keys) value)))
+
+(define (init-array-table keys value)
+  (cons (first keys) (list->vector `((,(cons (second keys) value))))))
+
+;; (define (keyval->scm keys value array-table-index))
+(define t (init-array-table '("a" "b") "3"))
+
+;; (vector-ref #((1) 2) 0)
+
+(define (add-kv-to-array array keys value index)
+  (define l (vector->list array))
+  (list-set! l
+             index
+             (add-kv-to-tree (vector-ref array index) keys value))
+  (list->vector l))
+
+
+;; (add-kv-to-array #((("a" . 2) ("b" . 2)) (("d" . 2))) '("c") '((integer "3")) 0)
+
+;; (vector-ref (vector->list #((()))) 0)
+;; (define (add-to-array-table tree table-keys keys value index)
+;;   (define table-content ())
+;;   3)
+
+(define (add-kv-to-tree-in-array tree table-keys keys value index)
   ;; (pretty-print value)
-  (if (null? keys)
-      ;; TODO helper to never call this on top-level
-      (cond (array-table-index
-             (log-exprs tree))
-            (else
-             ((value->scm) value)))
-      (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
-        (if k
-            (let ((e (list-ref tree k)))
-              (cond
-               ((and array-table-index (eq? 2 (length keys)) ((value?) e))
-                (log-exprs keys value e)
-                (list (cons
-                       (first keys)
-                       (list->vector (cons
-                                      (cons (second keys)
-                                            ((value->scm) (car value)))
-                                      (vector->list (cdr e)))))))
-               ;; (cons (first e) (cons)))
-               (((value?) e)
-                (error "guile-toml: redefinition not allowed"))
-               (else
-                (append
-                 (take tree k)
-                 (list (cons
-                        (car e)
-                        (add-to-tree (cdr e) (cdr keys) value array-table-index)))
-                 (drop tree (1+ k))))))
-            (cons (keyval->scm keys value array-table-index) tree)))))
+  (if (null? (cdr table-keys))
+      (begin
+        ;; (log-exprs "null" tree keys value (and (pair? tree) (cdr tree)))
+        (if (null? tree)
+            (list (cons (car table-keys) (add-kv-to-array (if (null? tree) #(()) (cdr tree)) keys value index)))
+            (let ((k (list-index (lambda (x) (equal? x (car table-keys))) (map car tree))))
+              ;; (log-exprs tree keys value k)
+              (if k
+                  (let ((e (list-ref tree k)))
+                    (append
+                     (take tree k)
+                     (list (cons
+                            (car e)
+                            (add-kv-to-array (cdr e) keys value index)))
+                     (drop tree (1+ k))))
+                  (cons (cons (car table-keys) (add-kv-to-array #(()) keys value index)) tree)))))))
+
+(define (add-kv-to-tree tree keys value)
+  ;; (pretty-print value)
+  (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
+    (if k
+        (let ((e (list-ref tree k)))
+          (cond
+           (((value?) e)
+            (error "guile-toml: redefinition not allowed"))
+           (else
+            (append
+             (take tree k)
+             (list (cons
+                    (car e)
+                    (add-kv-to-tree (cdr e) (cdr keys) value)))
+             (drop tree (1+ k))))))
+        (cons (keyval->scm keys value #f) tree))))
 
 (define (heads lst)
   (map (lambda (k) (list-head lst k)) (iota (length lst) 1)))
@@ -173,7 +212,7 @@
       (('keyval keys 'inline-table)
        (let ((keylist (append current-table (get-keys keys))))
          (set! inline-table-keys (cons keylist inline-table-keys))
-         (set! result (add-to-tree result keylist '(()) array-table-index))))
+         (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
       (('keyval keys ('inline-table keyvals ...))
        (set! result
              (loop (keyword-flatten '(keyval) keyvals)
@@ -184,17 +223,17 @@
       (('keyval ('simple-key value)) ;; special case for key being empty string
        (let ((keylist (append current-table '(""))))
          (check-inline-table-keys keylist inline-table-keys)
-         (set! result (add-to-tree result keylist (list value) array-table-index))))
+         (set! result (add-to-tree result current-table '("") (list value) array-table-index))))
       (('keyval keys value ...)
        (let ((keylist (append current-table (get-keys keys))))
          (check-inline-table-keys keylist inline-table-keys)
-         (set! result (add-to-tree result keylist value array-table-index))))
+         (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
       (('std-table keys ...)
        (set! array-table-index #f)
        (let ((keylist (get-keys keys)))
          (check-inline-table-keys keylist inline-table-keys)
          (unless (find-key result keylist)
-           (set! result (add-to-tree result keylist '(()) array-table-index)))
+           (set! result (add-to-tree result '() keylist '(()) array-table-index)))
          (set! current-table keylist)))
       (('array-table keys ...)
        (set! array-table-index 0)

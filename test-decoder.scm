@@ -33,6 +33,6 @@
 (define scm (parameterize ((value->scm test-value->scm)
                            (value? test-value?))
               (toml->scm str)))
-(pretty-print scm)
+;; (pretty-print scm)
 
 (define json (scm->json scm #:pretty #t #:unicode #t))
