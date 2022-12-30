@@ -17,7 +17,7 @@
 (define-peg-string-patterns
   "ALPHA <- [A-Z] / [a-z]
 DIGIT <- [0-9]
-HEXDIG <- DIGIT / 'A' / 'B' / 'C' / 'D' / 'E' / 'F'
+HEXDIG <- DIGIT / [A-Fa-f]
 ")
 ;; T-Newline
 (define-peg-string-patterns
@@ -45,7 +45,7 @@ wschar < ' ' / '\t'
 (define-peg-string-patterns
   "comment-start-symbol <- '#'
 
-comment <-- comment-start-symbol non-eol*
+comment < comment-start-symbol non-eol*
 ")
 ;; Key-Value pairs
 
@@ -80,7 +80,7 @@ basic-char <- basic-unescaped / escaped
 
 ;; basic-unescaped <- wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 (define-peg-pattern basic-unescaped body
-  (or wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
+  (or body-wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
 (define-peg-string-patterns
   "escaped <-- escape escape-seq-char
 
@@ -160,7 +160,7 @@ mll-content <- mll-char / body-newline
   (or "\t" (range #\x20 #\x26) (range #\x28 #\x7E) non-ascii))
 ;; Integer
 (define-peg-string-patterns
-  "integer <- dec-int / hex-int / oct-int / bin-int
+  "integer <- hex-int / oct-int / bin-int / dec-int
 
 minus <- '-'
 plus <- '+'
@@ -190,12 +190,12 @@ frac <- decimal-point zero-prefixable-int
 decimal-point <- '.'
 zero-prefixable-int <- DIGIT (DIGIT / underscore DIGIT)*
 
-t-exp <- 'e' float-t-exp-part
+t-exp <- [eE] float-t-exp-part
 float-t-exp-part <- (minus / plus)? zero-prefixable-int
 
-special-float <- (minus / plus)? ( t-inf / t-nan)
-t-inf <- 't-inf'
-t-nan <- 't-nan'
+special-float <-- (minus / plus)? ( t-inf / t-nan)
+t-inf <- 'inf'
+t-nan <- 'nan'
 ")
 ;; Boolean
 (define-peg-string-patterns
@@ -270,9 +270,9 @@ std-table-close < ws ']'
 (define-peg-string-patterns
   "inline-table <- inline-table-open inline-table-keyvals? inline-table-close
 
-inline-table-open  <- '{' ws
-inline-table-close <- ws '}'
-inline-table-sep   <- ws ',' ws
+inline-table-open  < '{' ws
+inline-table-close < ws '}'
+inline-table-sep   < ws ',' ws
 
 inline-table-keyvals <- keyval (inline-table-sep inline-table-keyvals)?
 ")
