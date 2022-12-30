@@ -1,5 +1,5 @@
-(define-module (toml)
-  #:use-module (toml parser)
+(define-module (toml parser)
+  #:use-module (toml parser-peg)
   #:use-module (ice-9 peg)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 pretty-print)
@@ -8,7 +8,6 @@
   #:use-module (srfi srfi-19)
   #:use-module (json)
   #:use-module (srfi srfi-1)
-  ;; TODO exporting flatten-array isn't nice, it's an internal function.
   #:export (toml->scm peg-tree->scm flatten-tree flatten-array value->scm validate-date-time read-string read-int value?))
 
 
@@ -337,20 +336,6 @@
      (k (find-key (cdr (list-ref tree k)) (cdr keys)))
      (else #f))))
 
-;; (define (find-array-key tree keys)
-;;   (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
-;;     (cond
-;;      ((and k (null? (cdr keys)))
-;;       (list-ref tree k))
-;;      (k
-;;       (find-key (cdr (list-ref tree k)) (cdr keys)))
-;;      (else #f))))
-
-;; (find-key '(("a" . #((("e" . 3) ("d" . 3))))) '("a" "e"))
-
-
-;; could refactor to have one 'keyval match, then match the rest again
-;; need to refactor parsing somehow to treat recursive array / inline-table definitions
 (define (toml->scm s)
   (define tree (parse s))
   (peg-tree->scm (flatten-tree tree)))
@@ -358,6 +343,7 @@
 (define (flatten-tree tree)
   (keyword-flatten '(keyval array-table std-table inline-table) tree))
 
+;; could refactor to have one 'keyval match, then match the rest again
 (define (peg-tree->scm tree)
   ;; (pretty-print tree)
   (let loop ((tree (cond ((null? tree) '(()))
