@@ -92,7 +92,7 @@
        (('inline-table "")
         '())
        (('inline-table xs ...)
-        (peg-tree->scm xs))
+        (peg-tree->scm (flatten-tree xs)))
        ((x y)
         (format #f "~a: ~a" x y))
        ('()
@@ -125,7 +125,7 @@
   (string->date s "~Y~m~d"))
 
 (define (time-local->date s)
-  (string->date s "~H:~M:~S"))
+  (datetime-local->date (string-append "1970-01-01T" s)))
 
 (define (remove-nanos s)
   (define nanos (string-match "\\.[0-9]+" s))
@@ -370,30 +370,7 @@
              (explicit-array-table-keys '())
              (new-explicit-table-keys '())
              (array-table-index #f))
-    ;; (pretty-print result)
-    ;; (newline)
     (match (car tree)
-      ;; (('keyval keys 'inline-table)
-      ;;  (let ((keylist (append current-table (get-keys keys))))
-      ;;    (set! explicit-keyval-keys (cons keylist explicit-keyval-keys))
-      ;;    (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
-
-      ;; (('keyval keys ('inline-table keyvals ...))
-      ;;  (let* ((keylist (append current-table (get-keys keys)))
-      ;;         (keylist-all-but-last (all-keys-but-last keylist)))
-      ;;    (when (not (eq? 1 (length (get-keys keys))))
-      ;;      (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
-      ;;      (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys)))
-      ;;    (set! result
-      ;;          (loop (keyword-flatten '(keyval) keyvals)
-      ;;                result
-      ;;                keylist
-      ;;                '()
-      ;;                '()
-      ;;                '()
-      ;;                '()
-      ;;                array-table-index))))
-
       (('keyval ('simple-key value)) ;; special case for key being empty string
        (let* ((keylist (append current-table '(""))))
          (if (not array-table-index)
@@ -403,14 +380,9 @@
       (('keyval keys value ...)
        (let* ((keylist (append current-table (get-keys keys)))
               (keylist-all-but-last (all-keys-but-last keylist)))
-         ;; (if (not array-table-index)
-         ;;     (check-keyval-keys keylist explicit-keyval-keys))
          (when (not (eq? 1 (length (get-keys keys))))
-           ;; (log-exprs explicit-table-keys keylist-all-but-last)
            (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
            (set! new-explicit-table-keys (cons keylist-all-but-last new-explicit-table-keys)))
-         ;; (when (find-key result keylist)
-         ;;   (error "guile-toml: redefinition not allowed"))
          (set! explicit-keyval-keys (cons keylist explicit-keyval-keys))
          (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
 
@@ -438,15 +410,10 @@
       (('array-table keys ...)
        (set! array-table-index 0)
        (let ((keylist (get-keys keys)))
-         ;; (check-keyval-keys keylist explicit-keyval-keys)
          (check-explicit-table-keys keylist (remove (lambda (x) (equal? x keylist)) explicit-table-keys))
          (set! explicit-array-table-keys (cons keylist explicit-array-table-keys))
          (set! current-table keylist)
          (set! result (add-to-tree result current-table '() '() array-table-index))))
-
-
-
-
       ('() '())
       (x (error x)))
 
@@ -460,9 +427,3 @@
               explicit-array-table-keys
               new-explicit-table-keys
               array-table-index))))
-
-
-;; (define (add-array-tables tree keys)
-;;   (if (null? keys)
-;;       tree
-;;       (add-array-tables (add-to-tree ) (cdr keys))))
