@@ -1,4 +1,4 @@
-(define-module (toml parser)
+(define-module (toml parser-peg)
   #:use-module (ice-9 peg)
   #:use-module (ice-9 pretty-print)
   #:export (parse))
