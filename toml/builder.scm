@@ -25,12 +25,35 @@
   (when newline?
     (newline port)))
 
-(define* (build-object-pair p port #:key (newline? #t) (inline? #f))
-  ;; (put-string port (car p))
+(define (toml-build-array-table-header keys port)
+  (put-string port "[[")
+  (build-keys keys port)
+  (put-string port "]]"))
+
+(define* (toml-build-array-table scm port #:optional (current-table '()))
+  (define header (car scm))
+  (define keys (append current-table (list header)))
+  (define entries (vector->list (cdr scm)))
+  (let loop ((entries entries))
+    (unless (null? entries)
+      (toml-build-array-table-header keys port)
+      (build-newline port #t)
+      (toml-build (car entries) port keys)
+      (loop (cdr entries)))))
+
+(define (array-table? v)
+  ;; (log-exprs v)
+  (and (vector? v) (not (any (value?) (vector->list v)))))
+
+(define* (build-object-pair p port #:optional (current-table '())#:key (newline? #t) (inline? #f))
+  (if (array-table? (cdr p))
+      (toml-build-array-table p port current-table)
+      (build-keyval p port #:newline? newline? #:inline? inline?)))
+
+(define* (build-keyval p port #:key (newline? #t) (inline? #f))
   (build-key (car p) port)
   (put-string port " = ")
   (toml-build (cdr p) port #:newline? newline? #:inline? inline?))
-
 ;; (define (escape-special c))
 
 
@@ -74,7 +97,7 @@
     (receive (keyvals tables)
         (partition value-pair? pairs)
       (for-each (lambda (kv)
-                  (build-object-pair kv port))
+                  (build-object-pair kv port current-table))
                 keyvals)
       (for-each (lambda (t)
                   (build-table t port current-table))
@@ -131,13 +154,17 @@
 
 (define* (toml-build scm port #:optional (current-table '())
                      #:key (newline? #t) (inline? #f))
+  ;; (log-exprs scm)
   (cond
    ;; ((eq? scm null) (toml-build-null port))
    ;; ((boolean? scm) (toml-build-boolean scm port))
    ;; ((toml-number? scm) (toml-build-number scm port))
    ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
+   ((null? scm) '())
    (((value?) scm)
     ((toml-build-value) scm port #:newline? newline? #:inline? inline?))
+   ((array-table? (and (list? scm) (cdr scm)))
+    (toml-build-array-table scm port))
    ((or (pair? scm) (null? scm))
     (if inline?
         (toml-build-inline-tree scm port)
