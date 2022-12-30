@@ -52,7 +52,7 @@ To start using guile-toml: ~(use-modules (toml))~
 #+end_src
 
 - Read a TOML file and parse it (example from [[https://toml.io][toml.io]]):
- #+begin_src scheme
+#+begin_src scheme
 > (use-modules (toml) (ice-9 textual-ports))
 > (toml->scm (call-with-input-file "example.toml" get-string-all))
 #+end_src
