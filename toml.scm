@@ -15,7 +15,7 @@
 (define-syntax-rule (log-exprs exp ...) (begin (format #t "~a: ~S\n" (quote exp) exp) ...))
 
 (define (flatten-array l)
-  (keyword-flatten '(string bool array inline-table date-time float integer) l))
+  (keyword-flatten '(string bool array inline-table datetime float integer) l))
 
 (define (get-keys l)
   (map (lambda (k) (read-string (cdr k))) (keyword-flatten '(simple-key) l)))
@@ -83,6 +83,7 @@
        (('time-local v)
         (display "guile-toml: datetimes are currently not supported\n")
         v)
+
 
        ((x y)
         (format #f "~a: ~a" x y))
@@ -207,6 +208,7 @@
 ;; adds kv pair which is within an array table (needs a better name)
 (define (add-kv-to-tree-in-array tree table-keys keys value index)
   ;; (pretty-print value)
+  ;; (log-exprs tree table-keys keys ".")
   (if (null? (cdr table-keys))
       (begin
         ;; (log-exprs "/////////////" tree table-keys keys value "///////////////")
@@ -221,8 +223,9 @@
                   (cons (cons (car table-keys) (make-vector 1 '())) tree)))))
       ;; (cons (cons (car table-keys) (add-kv-to-array #(()) keys value index)) tree)))))
       (let ((f (find-subtree tree (car table-keys))))
+        ;; (log-exprs f table-keys keys value)
         (cond
-         ((and f)
+         ((and f (vector? (cddr f)))
           ;; (log-exprs "-----" tree table-keys keys value f "------------")
           (let* ((k (car f)) (e (cdr f))
                  (array (cdr e))
@@ -231,21 +234,34 @@
                  (new-el (add-kv-to-tree-in-array el-of-array (cdr table-keys) keys value index)))
             ;; (log-exprs "~~~" array el-of-array new-el "~~~")
             (vector-set! array len new-el)
-            tree))))))
+            tree))
+         (f
+          (let* ((k (car f)) (e (cdr f)))
+            (replace-in-tree tree (car e) k (add-kv-to-tree-in-array (cdr e) (cdr table-keys) keys value index))))
+         (else
+          (cons (cons (car table-keys) (add-kv-to-tree-in-array '()
+                                                                (cdr table-keys) keys value index))
+                tree))))))
 
 (define (add-kv-to-tree tree keys value)
   ;; (pretty-print value)
   ;; (log-exprs tree keys value)
   (let ((k (and (not (null? keys))
                 (list-index (lambda (x) (equal? x (car keys))) (map car tree)))))
+    ;; (log-exprs k "!")
     (if k
         (let ((e (list-ref tree k)))
           (cond
+           ((vector? (cdr e))
+            ;; (cons (add-kv-to-array (cdr e) keys value #f))
+            (replace-in-tree tree (car e) k (add-kv-to-array (cdr e) (cdr keys) value #f)))
            (((value?) e)
             (error "guile-toml: redefinition not allowed"))
            (else
             (replace-in-tree tree (car e) k (add-kv-to-tree (cdr e) (cdr keys) value)))))
-        (cons (keyval->scm keys value #f) tree))))
+        (if (and (null? keys) (null? (car value)))
+            tree
+            (cons (keyval->scm keys value #f) tree)))))
 
 ;; '(a b c) -> '((a) (a b) (a b c))
 (define (heads lst)
@@ -265,12 +281,12 @@
     (#f '())
     (x x)))
 
-(define* (check-explicit-table-keys keylist explicit-table-keys #:optional (current-table-length 0))
-  (when (and (not (null? keylist))
-             (or
-              (member keylist explicit-table-keys)
-              (any (lambda (x) (member x explicit-table-keys)) (safe-drop (heads keylist) current-table-length))))
-    (error "guile-toml: redefinition not allowed" keylist explicit-table-keys current-table-length)))
+;; (define* (check-explicit-table-keys keylist explicit-table-keys #:optional (current-table-length 0))
+;;   (when (and (not (null? keylist))
+;;              (or
+;;               (member keylist explicit-table-keys)
+;;               (any (lambda (x) (member x explicit-table-keys)) (safe-drop (heads keylist) current-table-length))))
+;;     (error "guile-toml: redefinition not allowed" keylist explicit-table-keys current-table-length)))
 
 ;; we check all heads of keylist, and drop the keys containing only the current table before
 (define* (check-explicit-table-keys keylist explicit-table-keys #:optional (current-table-length 0))
@@ -284,12 +300,36 @@
 ;; (check-explicit-table-keys '("x") '(("x" "c" "s")) 2)
 (define (all-keys-but-last l) (reverse (cdr (reverse l))))
 
+;; (define (car-or-last-of-vector lv)
+;;   (if (vector? lv)
+;;       (vector-ref lv (vector-length lv))
+;;       (car lv)))
+(define (tree-or-last-of-vector tree)
+  (if (vector? tree)
+      (vector-ref tree (1- (vector-length tree)))
+      tree))
+
 (define (find-key tree keys)
-  (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
+  ;; (log-exprs tree keys)
+  (let* ((tree (tree-or-last-of-vector tree))
+         (k (list-index (lambda (x) (equal? x (car keys)))
+                        (map car tree))))
     (cond
      ((and k (null? (cdr keys))) (list-ref tree k))
      (k (find-key (cdr (list-ref tree k)) (cdr keys)))
      (else #f))))
+
+;; (define (find-array-key tree keys)
+;;   (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
+;;     (cond
+;;      ((and k (null? (cdr keys)))
+;;       (list-ref tree k))
+;;      (k
+;;       (find-key (cdr (list-ref tree k)) (cdr keys)))
+;;      (else #f))))
+
+;; (find-key '(("a" . #((("e" . 3) ("d" . 3))))) '("a" "e"))
+
 
 ;; could refactor to have one 'keyval match, then match the rest again
 ;; need to refactor parsing somehow to treat recursive array / inline-table definitions
@@ -300,12 +340,16 @@
              (current-table '())
              (inline-table-keys '())
              (explicit-table-keys '())
+             (explicit-array-table-keys '())
              (new-explicit-table-keys '())
              (array-table-index #f))
-    ;; (pretty-print tree)
+    ;; (pretty-print result)
+    ;; (newline)
     (match (car tree)
       (('keyval keys 'inline-table)
        (let ((keylist (append current-table (get-keys keys))))
+         (when (find-key result keylist)
+           (error "guile-toml: redefinition not allowed"))
          (set! inline-table-keys (cons keylist inline-table-keys))
          (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
 
@@ -319,6 +363,7 @@
                (loop (keyword-flatten '(keyval) keyvals)
                      result
                      keylist
+                     '()
                      '()
                      '()
                      '()
@@ -340,23 +385,31 @@
          (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
 
       (('std-table keys ...)
-       (set! array-table-index #f)
        (let ((keylist (get-keys keys)))
          (set! explicit-table-keys (append new-explicit-table-keys explicit-table-keys))
          (set! new-explicit-table-keys '())
          (check-inline-table-keys keylist inline-table-keys)
-         (check-explicit-table-keys keylist explicit-table-keys (length current-table))
+         (if array-table-index
+             (when (find-key result keylist)
+               (check-explicit-table-keys keylist
+                                          (append explicit-array-table-keys explicit-table-keys)
+                                          (length current-table)))
+             (check-explicit-table-keys keylist
+                                        (append explicit-array-table-keys explicit-table-keys)
+                                        (length current-table)))
+         (set! array-table-index #f)
          (set! explicit-table-keys (cons keylist explicit-table-keys))
-         ;; (log-exprs explicit-table-keys)
-         (unless (find-key result keylist)
-           (set! result (add-to-tree result '() keylist '(()) array-table-index)))
+         ;; (log-exprs array-table-index explicit-table-keys)
+         ;; (unless (find-key result keylist)
+         (set! result (add-to-tree result '() keylist '(()) array-table-index))
          (set! current-table keylist)))
 
       (('array-table keys ...)
        (set! array-table-index 0)
        (let ((keylist (get-keys keys)))
          (check-inline-table-keys keylist inline-table-keys)
-         (check-explicit-table-keys keylist explicit-table-keys)
+         (check-explicit-table-keys keylist (remove (lambda (x) (equal? x keylist)) explicit-table-keys))
+         (set! explicit-array-table-keys (cons keylist explicit-array-table-keys))
          (set! current-table keylist)
          (set! result (add-to-tree result current-table '() '() array-table-index))))
 
@@ -372,6 +425,7 @@
               current-table
               inline-table-keys
               explicit-table-keys
+              explicit-array-table-keys
               new-explicit-table-keys
               array-table-index))))
 
