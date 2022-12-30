@@ -2,6 +2,7 @@
 
 
 * guile-toml
+TOML for Guile. v1.0 compliant. (TODO: encoder)
 
 ** Installation
 For now: add this folder to ~GUILE_LOAD_PATH~
