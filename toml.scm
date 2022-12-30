@@ -48,7 +48,6 @@
     ("0x" (string->number data 16))
     (_ (string->number str 10))))
 
-(define v "-.2e28")
 ;; we want to be able to dynamically bind this function in test-decoder.scm
 (define value->scm
   (make-parameter
@@ -131,11 +130,7 @@
 (define (init-array-table keys value)
   (cons (first keys) (list->vector `((,(cons (second keys) value))))))
 
-;; (define (keyval->scm keys value array-table-index))
-(define t (init-array-table '("a" "b") "3"))
-
-;; (vector-ref #((1) 2) 0)
-
+;; adds kv to the tree within array[(length array)], always in the last position of the array
 (define (add-kv-to-array array keys value index)
   (define l (vector->list array))
   (define k (1- (length l)))
@@ -152,14 +147,7 @@
 
 
 
-;; (extend-array-table #(((a . 2) (b . 4))))
-;; (vector-ref (vector->list #((()))) 0)
-;; (define (add-to-array-table tree table-keys keys value index)
-;;   (define table-content ())
-;;   3)
-;; (add-kv-to-tree-in-array)
-
-;; c
+;; replaces keys at position k in tree (probably could just use list-set! here)
 (define (replace-in-tree tree keyname k new)
   ;; (log-exprs "repla" tree keyname k new)
   (append
@@ -171,6 +159,7 @@
 
 
 
+;; adds kv pair which is within an array table (needs a better name)
 (define (add-kv-to-tree-in-array tree table-keys keys value index)
   ;; (pretty-print value)
   (if (null? (cdr table-keys))
@@ -198,12 +187,7 @@
             ;; (log-exprs "~~~" array el-of-array new-el "~~~")
             (vector-set! array len new-el)
             tree))))))
-;; (log-exprs (cdr e) "vvvvvvvvvvv")
-;; (replace-in-tree
-;;  tree
-;;  (car e)
-;;  k
-;;  (list->vector (add-kv-to-tree-in-array (vector->list (cdr e)) (cdr table-keys) keys value index)))))))))
+
 (define (add-kv-to-tree tree keys value)
   ;; (pretty-print value)
   ;; (log-exprs tree keys value)
@@ -218,6 +202,7 @@
             (replace-in-tree tree (car e) k (add-kv-to-tree (cdr e) (cdr keys) value)))))
         (cons (keyval->scm keys value #f) tree))))
 
+;; '(a b c) -> '((a) (a b) (a b c))
 (define (heads lst)
   (map (lambda (k) (list-head lst k)) (iota (length lst) 1)))
 
@@ -229,6 +214,7 @@
       (begin
         (error "guile-toml: redefinition not allowed")))))
 
+;; a drop that doesn't error out when k is too big
 (define (safe-drop lst k)
   (match (false-if-exception (drop lst k))
     (#f '())
@@ -241,6 +227,7 @@
               (any (lambda (x) (member x explicit-table-keys)) (safe-drop (heads keylist) current-table-length))))
     (error "guile-toml: redefinition not allowed" keylist explicit-table-keys current-table-length)))
 
+;; we check all heads of keylist, and drop the keys containing only the current table before
 (define* (check-explicit-table-keys keylist explicit-table-keys #:optional (current-table-length 0))
   ;; (log-exprs keylist explicit-table-keys current-table-length "____")
   (when (and (not (null? keylist))
@@ -259,6 +246,8 @@
      (k (find-key (cdr (list-ref tree k)) (cdr keys)))
      (else #f))))
 
+;; could refactor to have one 'keyval match, then match the rest again
+;; need to refactor parsing somehow to treat recursive array / inline-table definitions
 (define (toml->scm s)
   (define tree (parse s))
   (let loop ((tree (if (symbol? (car tree)) (list tree) tree))
