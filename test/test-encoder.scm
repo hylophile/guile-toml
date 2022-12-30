@@ -25,6 +25,13 @@
   (match type
     ("string"
      (toml-build-string value port))
+    ("float"
+     (put-string port (string-append value
+                                     (if (or
+                                          (string-contains value "n")
+                                          (string-contains value "."))
+                                         ""
+                                         ".0"))))
     (_
      (put-string port value))))
 ;; ("integer")))
