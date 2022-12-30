@@ -182,6 +182,16 @@
   (build-delimited (vector->list v) port)
   (put-string port "]"))
 
+;; (define x (make-date 0 0 1 1 1 1 0 0))
+;; (date->toml-datetime x)
+
+(define (date->toml-datetime date)
+  (define format (string-append
+                  "~Y-~m-~dT~H:~M:~S"
+                  (if (< 0 (date-nanosecond date)) ".~N" "")
+                  "~z"))
+  (date->string date format))
+
 (define toml-build-value
   (make-parameter
    (lambda*
@@ -189,13 +199,14 @@
      (cond
       ;; ((eq? scm null) (toml-build-null port))
       ;; ((boolean? scm) (toml-build-boolean scm port))
-      ;; ((toml-number? scm) (toml-build-number scm port))
       ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
+
+      ;; TODO float (nan, inf)
+      ((date? scm) (put-string port (date->toml-datetime scm)))
       ((vector? scm) (toml-build-array scm port))
       ((string? scm) (toml-build-string scm port))
       (else (display scm port)))
      (build-newline port newline?))))
-
 
 (define* (toml-build scm port #:optional (current-table '())
                      #:key (newline? #t) (inline? #f))
