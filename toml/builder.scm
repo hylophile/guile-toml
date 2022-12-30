@@ -192,7 +192,8 @@
       ;; ((toml-number? scm) (toml-build-number scm port))
       ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
       ((vector? scm) (toml-build-array scm port))
-      ((string? scm) (toml-build-string scm port)))
+      ((string? scm) (toml-build-string scm port))
+      (else (display scm port)))
      (build-newline port newline?))))
 
 
@@ -204,7 +205,8 @@
    ;; ((boolean? scm) (toml-build-boolean scm port))
    ;; ((toml-number? scm) (toml-build-number scm port))
    ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
-   ((null? scm) '())
+   ((null? scm)
+    (and inline? (toml-build-inline-tree '() port)))
    (((value?) scm)
     ((toml-build-value) scm port #:newline? newline? #:inline? inline?))
    ((array-table? (and (list? scm) (cdr scm)))
