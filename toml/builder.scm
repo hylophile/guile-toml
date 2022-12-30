@@ -17,25 +17,20 @@
 
 ;; (define scm->value
 ;;   (lambda))
+(define (build-newline port newline?)
+  (when newline?
+    (newline port)))
+
 
 (define (build-object-pair p port)
-  ;; (log-exprs p)
-  ;; (put-string port "pair:")
   (put-string port (car p))
   (put-string port " = ")
-  ;; (put-string port (cdr p))
-  ;; (newline port)
-  ;; (put-string port (indent-string pretty level))
-  ;; (json-build-string (car p) port solidus unicode)
-  ;; (put-string port ":")
-  ;; (build-space port pretty)
   (toml-build (cdr p) port))
 
 (define (toml-build-string s port)
   (put-string port "\"")
   (put-string port s)
-  (put-string port "\"")
-  (newline port))
+  (put-string port "\""))
 
 ;; (define (values-first a b)
 ;;   (let ((av? ((value?) a))
@@ -75,8 +70,20 @@
 ;;             (build-object-pair p port))
 ;;           (cdr pairs))
 ;; (newline port))))
+(define (toml-build-array v port)
+  (put-string port "[")
+  (let loop ((lst (vector->list v)))
+    (if (null? (cdr lst))
+        (toml-build (car lst) port #:newline? #f)
+        (begin (toml-build (car lst) port #:newline? #f)
+               (put-string port ", ")
+               (loop (cdr lst)))))
+  (put-string port "]"))
 
-(define* (toml-build scm port #:optional (current-table '()))
+
+
+(define* (toml-build scm port #:optional (current-table '())
+                     #:key (newline? #t))
   ;; (log-exprs scm)
   (cond
    ;; ((eq? scm null) (toml-build-null port))
@@ -84,9 +91,10 @@
    ;; ((toml-number? scm) (toml-build-number scm port))
    ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
    ((string? scm) (toml-build-string scm port))
-   ;; ((vector? scm) (toml-build-array scm port))
+   ((vector? scm) (toml-build-array scm port))
    ((or (pair? scm) (null? scm))
-    (toml-build-tree scm port current-table))))
+    (toml-build-tree scm port current-table)))
+  (build-newline port newline?))
 ;; (else (throw 'toml-invalid scm))))
 
 (define* (scm->toml scm
@@ -97,7 +105,8 @@
 ;; (scm->toml '(("yo" ("a" . "b"))))
 (scm->toml '(("hi"
               ("yo" ("a" . "b") ("c" . "d"))
-              ("e" . "f"))
+              ;; ("e" . #("f" "b" (("a" . "b")))) TODO inline-tables
+              ("e" . #("f" "b" "g")))
              ("g" . "p")))
 
 '(("servers"
