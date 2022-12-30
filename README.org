@@ -1,15 +1,16 @@
-#+title: Readme
 
 
 * guile-toml
-TOML for Guile. v1.0 compliant. (TODO: encoder)
+
+TOML for Guile; v1.0 compliant.
 
 ** Installation
+
 For now: add this folder to ~GUILE_LOAD_PATH~
 
 ** Usage
 
-When parsing and building TOML documents, guile-toml follows [[https://github.com/aconchillo/guile-json][guile-json]] as close as possible. TOML types correspon to Guile types according to the following table:
+When parsing and building TOML documents, guile-toml follows [[https://github.com/aconchillo/guile-json][guile-json]] as close as possible. TOML types correspond to Guile types according to the following table:
 
 | TOML           | Guile            |
 |----------------+------------------|
@@ -38,11 +39,15 @@ To start using guile-toml: ~(use-modules (toml))~
 *** Building TOML documents
 - ~(scm->toml native #:optional port)~
 
-  Not implemented yet.
+  Creates a TOML document from the given native Guile value. The TOML document is written into the given port, or to the current output port if none is given.
+
 ** Examples
 - Basic ~toml->scm~ usage:
 #+begin_src scheme
 > (toml->scm "[a]\n b.c = \"hi world\"")
+#+end_src
+
+#+begin_src scheme
 (("a" ("b" ("c" . "hi world"))))
 #+end_src
 
@@ -50,7 +55,9 @@ To start using guile-toml: ~(use-modules (toml))~
  #+begin_src scheme
 > (use-modules (toml) (ice-9 textual-ports))
 > (toml->scm (call-with-input-file "example.toml" get-string-all))
+#+end_src
 
+#+begin_src scheme
 (("servers"
   ("beta" ("role" . "backend") ("ip" . "10.0.0.2"))
   ("alpha"
