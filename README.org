@@ -12,7 +12,7 @@ When parsing and building TOML documents, guile-toml follows [[https://github.co
 
 | TOML           | Guile            |
 |----------------+------------------|
-| string         | string           |
+| string         | string [0]        |
 | key-value pair | alist            |
 | array          | vector           |
 | integer/float  | real             |
@@ -23,6 +23,8 @@ When parsing and building TOML documents, guile-toml follows [[https://github.co
 | ±inf           | ±inf.0            |
 
 To start using guile-toml: ~(use-modules (toml))~
+
+[0]: TOML's default behaviour for invalid UTF-8 is to fail, whereas [[https://www.gnu.org/software/guile/manual/html_node/Encoding.html][Guile's default behavior]] is to replace invalid UTF-8 with �. If you prefer TOML's behavior, use ~(set-port-conversion-strategy! (current-input-port) 'error)~.
 
 [1]: TOML's ~time-local~ is parsed same as a ~datetime-local~ on the date of ~1970-01-01~.
 
