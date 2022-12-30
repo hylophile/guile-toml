@@ -112,11 +112,15 @@
   (make-parameter
    (lambda (expr) (not (list? expr)))))
 
-(define (find-subtree tree keys)
-  (cond ((null? keys) #f)
-        (else (let ((k (list-index (lambda (x) (equal? x (car keys)))
-                                   (map car tree))))
-                (and k (list-ref tree k))))))
+(define (find-subtree tree key)
+  (let ((k (list-index (lambda (x) (equal? x key))
+                       (map car tree))))
+    (and k (cons k (list-ref tree k)))))
+
+(find-subtree '(("x" ("y"))) "x")
+(find-subtree '(("a" . 2) ("b" . 2)) '("c"))
+;; (map car '(("x")))
+
 
 
 (define (add-to-tree tree table-keys keys value array-table-index)
@@ -134,40 +138,75 @@
 
 (define (add-kv-to-array array keys value index)
   (define l (vector->list array))
-  (list-set! l
-             index
-             (add-kv-to-tree (vector-ref array index) keys value))
-  (list->vector l))
-
+  (define k (1- (length l)))
+  (if (eq? '() value)
+      (extend-array-table array)
+      (begin (list-set! l
+                        k
+                        (add-kv-to-tree (vector-ref array k) keys value))
+             (list->vector l))))
 
 ;; (add-kv-to-array #((("a" . 2) ("b" . 2)) (("d" . 2))) '("c") '((integer "3")) 0)
+(define (extend-array-table array)
+  (list->vector (append (vector->list array) '(()))))
 
+
+
+;; (extend-array-table #(((a . 2) (b . 4))))
 ;; (vector-ref (vector->list #((()))) 0)
 ;; (define (add-to-array-table tree table-keys keys value index)
 ;;   (define table-content ())
 ;;   3)
+;; (add-kv-to-tree-in-array)
+
+;; c
+(define (replace-in-tree tree keyname k new)
+  ;; (log-exprs "repla" tree keyname k new)
+  (append
+   (take tree k)
+   (list (cons
+          keyname
+          new))
+   (drop tree (1+ k))))
+
+
 
 (define (add-kv-to-tree-in-array tree table-keys keys value index)
   ;; (pretty-print value)
   (if (null? (cdr table-keys))
       (begin
-        ;; (log-exprs "null" tree keys value (and (pair? tree) (cdr tree)))
-        (if (null? tree)
-            (list (cons (car table-keys) (add-kv-to-array (if (null? tree) #(()) (cdr tree)) keys value index)))
+        ;; (log-exprs "/////////////" tree table-keys keys value "///////////////")
+        (if (or (null? tree) (null? (car tree)))
+            ;; (list (cons (car table-keys) (add-kv-to-array (if (null? tree) #(()) (cdr tree)) keys value index)))
+            (list (cons (car table-keys) (make-vector 1 '())))
             (let ((k (list-index (lambda (x) (equal? x (car table-keys))) (map car tree))))
               ;; (log-exprs tree keys value k)
               (if k
                   (let ((e (list-ref tree k)))
-                    (append
-                     (take tree k)
-                     (list (cons
-                            (car e)
-                            (add-kv-to-array (cdr e) keys value index)))
-                     (drop tree (1+ k))))
-                  (cons (cons (car table-keys) (add-kv-to-array #(()) keys value index)) tree)))))))
-
+                    (replace-in-tree tree (car e) k (add-kv-to-array (cdr e) keys value 0)))
+                  (cons (cons (car table-keys) (make-vector 1 '())) tree)))))
+      ;; (cons (cons (car table-keys) (add-kv-to-array #(()) keys value index)) tree)))))
+      (let ((f (find-subtree tree (car table-keys))))
+        (cond
+         ((and f)
+          ;; (log-exprs "-----" tree table-keys keys value f "------------")
+          (let* ((k (car f)) (e (cdr f))
+                 (array (cdr e))
+                 (len (1- (vector-length array)))
+                 (el-of-array (vector-ref array len))
+                 (new-el (add-kv-to-tree-in-array el-of-array (cdr table-keys) keys value index)))
+            ;; (log-exprs "~~~" array el-of-array new-el "~~~")
+            (vector-set! array len new-el)
+            tree))))))
+;; (log-exprs (cdr e) "vvvvvvvvvvv")
+;; (replace-in-tree
+;;  tree
+;;  (car e)
+;;  k
+;;  (list->vector (add-kv-to-tree-in-array (vector->list (cdr e)) (cdr table-keys) keys value index)))))))))
 (define (add-kv-to-tree tree keys value)
   ;; (pretty-print value)
+  ;; (log-exprs tree keys value)
   (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
     (if k
         (let ((e (list-ref tree k)))
@@ -175,12 +214,7 @@
            (((value?) e)
             (error "guile-toml: redefinition not allowed"))
            (else
-            (append
-             (take tree k)
-             (list (cons
-                    (car e)
-                    (add-kv-to-tree (cdr e) (cdr keys) value)))
-             (drop tree (1+ k))))))
+            (replace-in-tree tree (car e) k (add-kv-to-tree (cdr e) (cdr keys) value)))))
         (cons (keyval->scm keys value #f) tree))))
 
 (define (heads lst)
@@ -239,7 +273,8 @@
        (set! array-table-index 0)
        (let ((keylist (get-keys keys)))
          (check-inline-table-keys keylist inline-table-keys)
-         (set! current-table keylist)))
+         (set! current-table keylist)
+         (set! result (add-to-tree result current-table '() '() array-table-index))))
 
 
 
@@ -253,3 +288,9 @@
               current-table
               inline-table-keys
               array-table-index))))
+
+
+(define (add-array-tables tree keys)
+  (if (null? keys)
+      tree
+      (add-array-tables (add-to-tree tree) (cdr keys))))
