@@ -5,7 +5,9 @@
 
 ** Installation
 For now: add this folder to ~GUILE_LOAD_PATH~
+
 ** Usage
+
 When parsing and building TOML documents, guile-toml follows [[https://github.com/aconchillo/guile-json][guile-json]] as close as possible. TOML types correspon to Guile types according to the following table:
 
 | TOML           | Guile            |
@@ -18,20 +20,48 @@ When parsing and building TOML documents, guile-toml follows [[https://github.co
 | false          | #f               |
 | datetime       | SRFI-19 date [1] |
 | nan            | +nan.0           |
-| {+-}inf        | {+-}inf.0        |
+| ±inf           | ±inf.0            |
 
 To start using guile-toml: ~(use-modules (toml))~
 
 [1]: TOML's ~time-local~ is parsed same as a ~datetime-local~ on the date of ~1970-01-01~.
 
 *** Reading TOML documents
+
 - ~(toml->scm str)~
+
   Reads a TOML document from the given string.
+
 *** Building TOML documents
 - ~(scm->toml native #:optional port)~
+
   Not implemented yet.
 ** Examples
+- Basic ~toml->scm~ usage:
 #+begin_src scheme
 > (toml->scm "[a]\n b.c = \"hi world\"")
 (("a" ("b" ("c" . "hi world"))))
 #+end_src
+
+- Read a TOML file and parse it (example from [[https://toml.io][toml.io]]):
+ #+begin_src scheme
+> (use-modules (toml) (ice-9 textual-ports))
+> (toml->scm (call-with-input-file "example.toml" get-string-all))
+
+(("servers"
+  ("beta" ("role" . "backend") ("ip" . "10.0.0.2"))
+  ("alpha"
+   ("role" . "frontend")
+   ("ip" . "10.0.0.1")))
+ ("database"
+  ("temp_targets" ("case" . 72.0) ("cpu" . 79.5))
+  ("data" . #(#("delta" "phi") #(3.14)))
+  ("ports" . #(8000 8001 8002))
+  ("enabled" . #t))
+ ("owner"
+  ("dob"
+   .
+   #<date nanosecond: 0 second: 0 minute: 32 hour: 7 day: 27 month: 5 year: 1979 zone-offset: -28800>)
+  ("name" . "Tom Preston-Werner"))
+ ("title" . "TOML Example"))
+ #+end_src
