@@ -34,7 +34,7 @@ To start using guile-toml: ~(use-modules (toml))~
 
 - ~(toml->scm str)~
 
-  Reads a TOML document from the given string.
+  Reads a TOML document from the given string. Guile-toml's parsing is implemented with ~(ice-9 peg)~, which unfortunately does not support ports. See below for how to use this with a TOML file.
 
 *** Building TOML documents
 - ~(scm->toml native #:optional port)~
