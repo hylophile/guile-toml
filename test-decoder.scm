@@ -13,12 +13,18 @@
        `(("value" . "") ("type" . "string")))
       (('integer x)
        `(("value" . ,(number->string (read-int x))) ("type" . "integer")))
+      (('datetime v)
+       (rfc3339-string->date v)
+       `(("value" . ,v) ("type" . "datetime")))
+
       ((x y)
        `(("value" . ,y) ("type" . ,(symbol->string x))))
       ('()
        '())
       (_ (error "err: ~a" v)))))
 
+;; srfi-19
+;; (string->date "1987-08-03T18:28:12.234+08:00" "~Y-~m-~dT~H:~M:~S.~N~z")
 
 (define test-value?
   (lambda (expr)

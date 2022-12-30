@@ -4,10 +4,12 @@
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 pretty-print)
   #:use-module (ice-9 match)
+  #:use-module (ice-9 regex)
+  #:use-module (srfi srfi-19)
   #:use-module (json)
   #:use-module (srfi srfi-1)
   ;; TODO exporting flatten-array isn't nice, it's an internal function.
-  #:export (toml->scm flatten-array value->scm read-string read-int value?))
+  #:export (toml->scm flatten-array value->scm rfc3339-string->date read-string read-int value?))
 
 
 (define-syntax-rule (log-exprs exp ...) (begin (format #t "~a: ~S\n" (quote exp) exp) ...))
@@ -71,8 +73,7 @@
        (('bool v)
         (equal? v "true"))
        (('datetime v)
-        (display "guile-toml: datetimes are currently not supported\n")
-        v)
+        (car (strptime "%FT%T%z" v)))
        (('datetime-local v)
         (display "guile-toml: datetimes are currently not supported\n")
         v)
@@ -93,7 +94,46 @@
        ;;  '())
        (_ (error "err:" value-pair))))))
 
-;; ((value->scm) '(x "2"))
+(define (normalize-date-time s)
+  (define s-with-T (string-replace s "T" 10 11))
+  (define s-without-colon (if (string-match "[+-][0-9][0-9]:[0-9][0-9]$" s)
+                              (regexp-substitute #f (string-match ":([0-9][0-9])$" s-with-T) 'pre "" 1 'post)
+                              s-with-T))
+  s-without-colon)
+
+(define (datetime-string->date s)
+  (define format (string-append
+                  "~Y-~m-~dT~H:~M:~S"
+                  (if (string-contains s ".") ".~N" "")
+                  "~z"))
+  (string->date (normalize-date-time s) format))
+
+(define (validate-date-time v)
+  (match v
+    (('datetime s)
+     (strptime "%FT%T%z" (remove-nanos s)))
+    (('datetime-local)
+     (strptime "%FT%T" (remove-nanos s)))
+    (('date-local)
+     (strptime "%F" s))
+    (('time-local)
+     (strptime "%T" (remove-nanos s)))))
+
+(validate-date-time '(datetime "a"))
+
+(define (remove-nanos s)
+  (define nanos (string-match "\\.[0-9]+" s))
+  (define region (and nanos (vector-ref nanos 1)))
+  (if region
+      (string-replace s "" (car region) (cdr region))
+      s))
+
+
+(define s "1987-12-21T18:23:23.384792+08:00")
+;; (datetime-string->date "1987-12-21T18:23:23+08:00")
+;; (car (strptime "%FT%T%z" "1987-18-83T18:28:60+08:00"))
+;; (tm:gmtoff (car (strptime "%FT%T%z" "1987-12-13T18:28:60+9100")))
+;; (date->string (rfc3339-string->date "1987-12-83T18:28:60+08:00"))
 
 (define (keyval->scm keys value array-table-index)
   (let loop ((keys keys))
