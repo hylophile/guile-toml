@@ -4,7 +4,7 @@
   #:use-module (srfi srfi-19)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 receive)
-  #:export (scm->toml value?))
+  #:export (scm->toml value? toml-build-value toml-build-array))
 
 (define-syntax-rule (log-exprs exp ...) (begin (format (current-error-port) "~a: ~S\n" (quote exp) exp) ...))
 
@@ -13,6 +13,10 @@
 (define value?
   (make-parameter
    (lambda (expr) (not (list? expr)))))
+
+(define (value-pair? scm)
+  (and (string? (car scm))
+       ((value?) (cdr scm))))
 
 ;; (define scm->value
 ;;   (lambda))
@@ -44,9 +48,11 @@
 
 (define (toml-build-tree scm port current-table)
   (define pairs scm)
+  (log-exprs pairs)
   (unless (null? pairs)
     (receive (keyvals tables)
-        (partition (value?) pairs)
+        (partition value-pair? pairs)
+      (log-exprs "-----------------" keyvals tables "--------------")
       (for-each (lambda (kv)
                   (build-object-pair kv port))
                 keyvals)
@@ -63,7 +69,8 @@
                (loop (cdr lst))))))
 
 (define (build-delimited-pairs lst port)
-  (let loop ((lst lst))
+  (log-exprs "a" lst (car lst))
+  ( let loop ((lst lst))
     (if (null? (cdr lst))
         (build-object-pair (car lst) port #:newline? #f #:inline? #t)
         (begin (build-object-pair (car lst) port #:newline? #f #:inline? #t)
@@ -90,29 +97,31 @@
   (build-delimited (vector->list v) port)
   (put-string port "]"))
 
-;; (define (toml-build-value scm port)
-;;   (cond
-;;    ;; ((eq? scm null) (toml-build-null port))
-;;    ;; ((boolean? scm) (toml-build-boolean scm port))
-;;    ;; ((toml-number? scm) (toml-build-number scm port))
-;;    ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
-;;    ((string? scm) (toml-build-string scm port))
-;;    ((vector? scm) (toml-build-array scm port))
-;;    ((or (pair? scm) (null? scm))
-;;     (toml-build-tree scm port current-table)))
-;;   (build-newline port newline?))
+(define toml-build-value
+  (make-parameter
+   (lambda*
+       (scm port #:key (newline? #t) (inline? #f))
+     (cond
+      ;; ((eq? scm null) (toml-build-null port))
+      ;; ((boolean? scm) (toml-build-boolean scm port))
+      ;; ((toml-number? scm) (toml-build-number scm port))
+      ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
+      ((vector? scm) (toml-build-array scm port))
+      ((string? scm) (toml-build-string scm port)))
+     (build-newline port newline?))))
 
 
 (define* (toml-build scm port #:optional (current-table '())
                      #:key (newline? #t) (inline? #f))
-  ;; (log-exprs scm)
+  ;; (log-exprs "v" scm)
   (cond
    ;; ((eq? scm null) (toml-build-null port))
    ;; ((boolean? scm) (toml-build-boolean scm port))
    ;; ((toml-number? scm) (toml-build-number scm port))
    ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
-   ((string? scm) (toml-build-string scm port))
-   ((vector? scm) (toml-build-array scm port))
+   (((value?) scm)
+    (log-exprs "v" scm)
+    ((toml-build-value) scm port #:newline? newline? #:inline? inline?))
    ((or (pair? scm) (null? scm))
     (if inline?
         (toml-build-inline-tree scm port)
