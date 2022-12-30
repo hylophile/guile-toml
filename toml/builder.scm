@@ -45,14 +45,20 @@
 ;;     (av? #t)
 ;;     (bv? #f))))
 
-(define (build-table scm port)
+
+(define (build-keys lst port)
+  ;; TODO unicode keys
+  (put-string port (string-join lst ".")))
+
+(define (build-table scm port current-table)
+  (define new-table (append current-table (list (car scm))))
   (put-string port "[")
-  (put-string port (car scm))
+  (build-keys new-table port)
   (put-string port "]")
   (newline port)
-  (toml-build (cdr scm) port))
+  (toml-build (cdr scm) port new-table))
 
-(define (toml-build-object scm port)
+(define (toml-build-tree scm port current-table)
   (let ((pairs scm))
     (unless (null? pairs)
       (receive (keyvals tables)
@@ -61,7 +67,7 @@
                     (build-object-pair kv port))
                   keyvals)
         (for-each (lambda (t)
-                    (build-table t port))
+                    (build-table t port current-table))
                   tables)))))
 
 ;; (build-object-pair (car pairs) port)
@@ -70,7 +76,7 @@
 ;;           (cdr pairs))
 ;; (newline port))))
 
-(define (toml-build scm port)
+(define* (toml-build scm port #:optional (current-table '()))
   ;; (log-exprs scm)
   (cond
    ;; ((eq? scm null) (toml-build-null port))
@@ -80,7 +86,7 @@
    ((string? scm) (toml-build-string scm port))
    ;; ((vector? scm) (toml-build-array scm port))
    ((or (pair? scm) (null? scm))
-    (toml-build-object scm port))))
+    (toml-build-tree scm port current-table))))
 ;; (else (throw 'toml-invalid scm))))
 
 (define* (scm->toml scm
@@ -89,7 +95,10 @@
 
 ;; (scm->toml '(("a" . "b") ("c" . "d")))
 ;; (scm->toml '(("yo" ("a" . "b"))))
-;; (scm->toml '(("yo" ("a" . "b") ("c" . "d")) ("e" . "f")))
+(scm->toml '(("hi"
+              ("yo" ("a" . "b") ("c" . "d"))
+              ("e" . "f"))
+             ("g" . "p")))
 
 '(("servers"
    ("beta" ("role" . "backend") ("ip" . "10.0.0.2"))
