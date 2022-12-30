@@ -54,7 +54,7 @@
 (define value->scm
   (make-parameter
    (lambda (value-pair)
-     (log-exprs value-pair)
+     ;; (log-exprs value-pair)
      (match value-pair
        (('array value-pairs ...)
         ;; (log-exprs value-pairs (flatten-array value-pairs))
@@ -284,13 +284,14 @@
 (define (heads lst)
   (map (lambda (k) (list-head lst k)) (iota (length lst) 1)))
 
-(define (check-inline-table-keys keylist inline-table-keys)
+(define (check-keyval-keys keylist explicit-keyval-keys)
+  ;; (log-exprs keylist explicit-keyval-keys)
   (let ((heads (map (lambda (k) (list-head keylist k))
                     (iota (length keylist) 1))))
-    (when (any (lambda (x) (member x inline-table-keys))
+    (when (any (lambda (x) (member x explicit-keyval-keys))
                heads)
       (begin
-        (error "guile-toml: redefinition not allowed")))))
+        (error "guile-toml: redefinition not allowed" keylist explicit-keyval-keys)))))
 
 ;; a drop that doesn't error out when k is too big
 (define (safe-drop lst k)
@@ -364,7 +365,7 @@
                          (else tree)))
              (result '())
              (current-table '())
-             (inline-table-keys '())
+             (explicit-keyval-keys '())
              (explicit-table-keys '())
              (explicit-array-table-keys '())
              (new-explicit-table-keys '())
@@ -374,7 +375,7 @@
     (match (car tree)
       ;; (('keyval keys 'inline-table)
       ;;  (let ((keylist (append current-table (get-keys keys))))
-      ;;    (set! inline-table-keys (cons keylist inline-table-keys))
+      ;;    (set! explicit-keyval-keys (cons keylist explicit-keyval-keys))
       ;;    (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
 
       ;; (('keyval keys ('inline-table keyvals ...))
@@ -395,26 +396,30 @@
 
       (('keyval ('simple-key value)) ;; special case for key being empty string
        (let* ((keylist (append current-table '(""))))
-         (check-inline-table-keys keylist inline-table-keys)
+         (if (not array-table-index)
+             (check-keyval-keys keylist explicit-keyval-keys))
          (set! result (add-to-tree result current-table '("") (list value) array-table-index))))
 
       (('keyval keys value ...)
        (let* ((keylist (append current-table (get-keys keys)))
               (keylist-all-but-last (all-keys-but-last keylist)))
-         (check-inline-table-keys keylist inline-table-keys)
+         ;; (if (not array-table-index)
+         ;;     (check-keyval-keys keylist explicit-keyval-keys))
          (when (not (eq? 1 (length (get-keys keys))))
            ;; (log-exprs explicit-table-keys keylist-all-but-last)
            (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
            (set! new-explicit-table-keys (cons keylist-all-but-last new-explicit-table-keys)))
          ;; (when (find-key result keylist)
          ;;   (error "guile-toml: redefinition not allowed"))
+         (set! explicit-keyval-keys (cons keylist explicit-keyval-keys))
          (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
 
       (('std-table keys ...)
        (let ((keylist (get-keys keys)))
          (set! explicit-table-keys (append new-explicit-table-keys explicit-table-keys))
          (set! new-explicit-table-keys '())
-         (check-inline-table-keys keylist inline-table-keys)
+         (if (not array-table-index)
+             (check-keyval-keys keylist explicit-keyval-keys))
          (if array-table-index
              (when (find-key result keylist)
                (check-explicit-table-keys keylist
@@ -433,7 +438,7 @@
       (('array-table keys ...)
        (set! array-table-index 0)
        (let ((keylist (get-keys keys)))
-         (check-inline-table-keys keylist inline-table-keys)
+         ;; (check-keyval-keys keylist explicit-keyval-keys)
          (check-explicit-table-keys keylist (remove (lambda (x) (equal? x keylist)) explicit-table-keys))
          (set! explicit-array-table-keys (cons keylist explicit-array-table-keys))
          (set! current-table keylist)
@@ -450,7 +455,7 @@
         (loop (cdr tree)
               result
               current-table
-              inline-table-keys
+              explicit-keyval-keys
               explicit-table-keys
               explicit-array-table-keys
               new-explicit-table-keys
