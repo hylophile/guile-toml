@@ -24,12 +24,15 @@
   (lambda (expr)
     (and
      (string? (car expr))
-     (equal? (map car (cdr expr)) '("value" "type")))))
+     (or
+      (vector? (cdr expr))
+      (equal? (map car (cdr expr)) '("value" "type"))))))
 
 (define str (get-string-all (current-input-port)))
 
 (define scm (parameterize ((value->scm test-value->scm)
                            (value? test-value?))
               (toml->scm str)))
+(pretty-print scm)
 
 (define json (scm->json scm #:pretty #t #:unicode #t))

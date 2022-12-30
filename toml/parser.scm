@@ -247,13 +247,16 @@ full-time      <- partial-time time-offset
 ")
 ;; Array
 ;; array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
+;; array-values <- (ws-comment-t-newline val ws-comment-t-newline array-sep)* ws-comment-t-newline val ws-comment-t-newline array-sep?
 (define-peg-string-patterns
   "array <-- array-open array-values? ws-comment-t-newline array-close
 
 array-open < '['
 array-close < ']'
 
-array-values <- (ws-comment-t-newline val ws-comment-t-newline array-sep)* ws-comment-t-newline val ws-comment-t-newline array-sep?
+array-values <- array-values-1 / array-values-2
+array-values-1 <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values
+array-values-2 <- ws-comment-t-newline val ws-comment-t-newline array-sep?
 
 array-sep < ','
 
@@ -291,7 +294,7 @@ array-table-close < ws ']]'
 
 (define (parse str)
   (define record (keyword-flatten
-                  '(simple-key array keyval std-table inline-table)
+                  '(array keyval std-table inline-table)
                   (match-pattern toml str)))
   (if (eq? (string-length str) (peg:end record))
       (begin
