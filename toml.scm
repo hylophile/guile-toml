@@ -9,7 +9,7 @@
   #:use-module (json)
   #:use-module (srfi srfi-1)
   ;; TODO exporting flatten-array isn't nice, it's an internal function.
-  #:export (toml->scm flatten-array value->scm rfc3339-string->date read-string read-int value?))
+  #:export (toml->scm flatten-array value->scm validate-date-time read-string read-int value?))
 
 
 (define-syntax-rule (log-exprs exp ...) (begin (format #t "~a: ~S\n" (quote exp) exp) ...))
@@ -95,10 +95,11 @@
        (_ (error "err:" value-pair))))))
 
 (define (normalize-date-time s)
-  (define s-with-T (string-replace s "T" 10 11))
+  (define s-with-T (string-replace s "T" 10 11)) ;; could be t, T, or " ", so we can't just upcase all
+  (define s-upcased (string-upcase s-with-T))
   (define s-without-colon (if (string-match "[+-][0-9][0-9]:[0-9][0-9]$" s)
                               (regexp-substitute #f (string-match ":([0-9][0-9])$" s-with-T) 'pre "" 1 'post)
-                              s-with-T))
+                              s-upcased))
   s-without-colon)
 
 (define (datetime-string->date s)
@@ -108,19 +109,6 @@
                   "~z"))
   (string->date (normalize-date-time s) format))
 
-(define (validate-date-time v)
-  (match v
-    (('datetime s)
-     (strptime "%FT%T%z" (remove-nanos s)))
-    (('datetime-local)
-     (strptime "%FT%T" (remove-nanos s)))
-    (('date-local)
-     (strptime "%F" s))
-    (('time-local)
-     (strptime "%T" (remove-nanos s)))))
-
-(validate-date-time '(datetime "a"))
-
 (define (remove-nanos s)
   (define nanos (string-match "\\.[0-9]+" s))
   (define region (and nanos (vector-ref nanos 1)))
@@ -128,8 +116,25 @@
       (string-replace s "" (car region) (cdr region))
       s))
 
+(define (validate-date-time v)
+  (let ((result (match v
+                  (('datetime s)
+                   (strptime "%FT%T%z" (normalize-date-time (remove-nanos s))))
+                  (('datetime-local s)
+                   (strptime "%FT%T" (normalize-date-time (remove-nanos s))))
+                  (('date-local s)
+                   (strptime "%F" s))
+                  (('time-local s)
+                   (strptime "%T" (remove-nanos s))))))
+    (when (and result (< 60 (tm:sec (car result))))
+      (error "guile-toml: invalid date-time"))))
 
-(define s "1987-12-21T18:23:23.384792+08:00")
+;; (define s "1987-12-21")
+;; (tm:sec (car (strptime "%F" s)))
+;; (validate-date-time `(datetime ,s))
+
+
+
 ;; (datetime-string->date "1987-12-21T18:23:23+08:00")
 ;; (car (strptime "%FT%T%z" "1987-18-83T18:28:60+08:00"))
 ;; (tm:gmtoff (car (strptime "%FT%T%z" "1987-12-13T18:28:60+9100")))
