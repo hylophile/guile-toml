@@ -73,18 +73,17 @@
        (('bool v)
         (equal? v "true"))
        (('datetime v)
-        (car (strptime "%FT%T%z" v)))
+        (validate-date-time `(datetime ,v))
+        (datetime->date v))
        (('datetime-local v)
-        (display "guile-toml: datetimes are currently not supported\n")
-        v)
+        (validate-date-time `(datetime-local ,v))
+        (datetime-local->date v))
        (('date-local v)
-        (display "guile-toml: datetimes are currently not supported\n")
-        v)
+        (validate-date-time `(date-local ,v))
+        (date-local->date v))
        (('time-local v)
-        (display "guile-toml: datetimes are currently not supported\n")
-        v)
-
-
+        (validate-date-time `(time-local ,v))
+        (time-local->date v))
        ((x y)
         (format #f "~a: ~a" x y))
        ('()
@@ -103,12 +102,21 @@
                               s-upcased))
   s-without-colon)
 
-(define (datetime-string->date s)
+(define (datetime->date s)
   (define format (string-append
                   "~Y-~m-~dT~H:~M:~S"
                   (if (string-contains s ".") ".~N" "")
                   "~z"))
   (string->date (normalize-date-time s) format))
+
+(define (datetime-local->date s)
+  (string->date (normalize-date-time s) "~Y-~m-~dT~H:~M:~S"))
+
+(define (date-local->date s)
+  (string->date s "~Y~m~d"))
+
+(define (time-local->date s)
+  (string->date s "~H:~M:~S"))
 
 (define (remove-nanos s)
   (define nanos (string-match "\\.[0-9]+" s))
