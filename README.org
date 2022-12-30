@@ -2,7 +2,7 @@
 
 * guile-toml
 
-TOML for Guile; v1.0 compliant.
+TOML for Guile; v1.0.0 compliant.
 
 ** Installation
 
