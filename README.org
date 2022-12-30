@@ -1,0 +1,23 @@
+#+title: Readme
+
+
+* guile-toml
+
+** Installation
+For now: add this folder to =GUILE_LOAD_PATH=
+** Usage
+Similar approach to =guile-json=.
+
+| TOML           | Guile                            |
+|----------------+----------------------------------|
+| string         | string                           |
+| number         | number (TODO: octal etc, float?) |
+| key-value pair | alist                            |
+| array          | vector                           |
+| datetime etc   | TODO                             |
+| true           | #t (TODO)                        |
+| false          | #f                               |
+
+To start using: =(use-modules (toml))=
+** Reading TOML documents
+- =(toml->scm str)=
