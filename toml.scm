@@ -359,7 +359,9 @@
 
 (define (peg-tree->scm tree)
   ;; (pretty-print tree)
-  (let loop ((tree (if (symbol? (car tree)) (list tree) tree))
+  (let loop ((tree (cond ((null? tree) '(()))
+                         ((symbol? (car tree)) (list tree))
+                         (else tree)))
              (result '())
              (current-table '())
              (inline-table-keys '())
@@ -440,6 +442,7 @@
 
 
 
+      ('() '())
       (x (error x)))
 
     (if (null? (cdr tree))
