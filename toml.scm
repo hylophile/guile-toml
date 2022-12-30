@@ -6,7 +6,8 @@
   #:use-module (ice-9 pretty-print)
   #:use-module (ice-9 match)
   #:use-module (json)
-  #:use-module (srfi srfi-1))
+  #:use-module (srfi srfi-1)
+  #:export (toml->scm))
 
 
 ;; (define (a)
@@ -149,7 +150,10 @@
 
 ;; (keyval->scm '(simple-key "a") '(string "a"))
 
-(define (b s)
+;; TODO error if parsing not at end of input
+
+(define (toml->scm s)
+  ;; (display s)
   (let loop ((tree (keyword-flatten
                     '(simple-key array keyval std-table)
                     (parse s)))
@@ -174,15 +178,16 @@
         (loop (cdr tree) result current-table))))
 
 ;; (let ((single-value-proc annot-v-proc
-;;                 (b))))
+;;                 (toml->scm))))
 
 ;; (pretty-print (let ((single-value-proc annot-v-proc))
-;;                 (b)))
+;;                 (toml->scm)))
 
 ;; (display "\n\n\n")
-
-(display (scm->json (b (get-string-all (current-input-port)))))
-(newline)
+;; (toml->scm "[k]\na.b.c=2")
+;; (toml->scm "[k]")
+;; (display (scm->json (toml->scm (get-string-all (current-input-port)))))
+;; (newline)
 
 ;; (pretty-print (json-string->scm (call-with-input-file "spec-example-1-compact.json" get-string-all)))
 

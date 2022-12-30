@@ -149,7 +149,7 @@ mll-content <- mll-char / body-newline
   (or "\t" (range #\x20 #\x26) (range #\x28 #\x7E) non-ascii))
 ;; Integer
 (define-peg-string-patterns
-  "integer <- hex-int / oct-int / bin-int / dec-int
+  "integer <-- hex-int / oct-int / bin-int / dec-int
 
 minus <- '-'
 plus <- '+'
@@ -162,7 +162,7 @@ hex-prefix <- '0x'
 oct-prefix <- '0o'
 bin-prefix <- '0b'
 
-dec-int <-- (minus / plus)? unsigned-dec-int
+dec-int <- (minus / plus)? unsigned-dec-int
 unsigned-dec-int <- (digit1-9 ( DIGIT / (underscore DIGIT))+) / DIGIT
 
 hex-int <-- hex-prefix HEXDIG (HEXDIG / underscore HEXDIG)*
