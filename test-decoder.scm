@@ -1,22 +1,22 @@
 #!/usr/bin/env -S guile -s
 !#
-(use-modules (json) (toml) (ice-9 match) (ice-9 textual-ports))
+(use-modules (json) (toml) (ice-9 match) (ice-9 textual-ports) (ice-9 pretty-print))
 
 (define test-value->scm
   (lambda (v)
     (match v
       (('array vs ...)
-       ;; (pretty-print (flatten-array vs))
        (list->vector (map test-value->scm (flatten-array vs))))
-      ;; (format #f "array ~a" (flatten-array vs)))
+      (('string ys ...)
+       `(("value" . ,(read-string ys)) ("type" . "string")))
+      ('string
+       `(("value" . "") ("type" . "string")))
+      (('integer x)
+       `(("value" . ,(number->string (read-int x))) ("type" . "integer")))
       ((x y)
-       ;; (single-value-proc x y)
        `(("value" . ,y) ("type" . ,(symbol->string x))))
-      ;; (format #f "type: ~a, value: ~a" x y))
       ('()
        '())
-      ;; ('inline-table
-      ;;  '())
       (_ (error "err: ~a" v)))))
 
 
@@ -32,4 +32,4 @@
                            (value? test-value?))
               (toml->scm str)))
 
-(define json (scm->json scm #:pretty #t))
+(define json (scm->json scm #:pretty #t #:unicode #t))

@@ -7,37 +7,101 @@
   #:use-module (json)
   #:use-module (srfi srfi-1)
   ;; TODO exporting flatten-array isn't nice, it's an internal function.
-  #:export (toml->scm flatten-array value->scm value?))
+  #:export (toml->scm flatten-array value->scm read-string read-int value?))
 
 
 (define-syntax-rule (log-exprs exp ...) (begin (format #t "~a: ~S\n" (quote exp) exp) ...))
 
 (define (flatten-array l)
-  (keyword-flatten '(array dec-int float string bola) l))
+  (keyword-flatten '(string bool array inline-table date-time float integer) l))
 
 (define (get-keys l)
   (map cadr (keyword-flatten '(simple-key) l)))
 
+(define (unicode-point->string s)
+  (string (integer->char (string->number (substring s 2) 16))))
+
+;; (define (unicode-point->string s)
+;;   (define int (string->number (substring s 2) 16))
+;;   (if (eq? int 31)
+;;       "\u001f"
+;;       (string (integer->char int))))
+
+(define (unescape-escaped s)
+  ;; (pretty-print s)
+  (if (list? s)
+      (match (string-ref (cadr s) 1)
+        (#\\ "\\")
+        (#\" "\"")
+        (#\b "\b")
+        (#\f "\f")
+        (#\n "\n")
+        (#\r "\r")
+        (#\t "\t")
+        (#\u (unicode-point->string (cadr s)))
+        (#\U (unicode-point->string (cadr s)))
+        (_ (error "guile-toml: unsupported escape char:" (cadr s))))
+      s))
+
+;; (unescape-escaped '(escaped "\\u0100"))
+
+(define (read-string lst)
+  (string-join (map unescape-escaped (keyword-flatten '(escaped) lst)) ""))
+
+(define str "-0")
+(define (read-int str)
+  (define base (false-if-exception (substring str 0 2)))
+  (define data (false-if-exception (substring str 2)))
+  (match base
+    ("0b" (string->number data 2))
+    ("0o" (string->number data 8))
+    ("0x" (string->number data 16))
+    (_ (string->number str 10))))
+
+;; (read-int "-0")
+;; (string->number "-0" 10)
 ;; we want to be able to dynamically bind this function in test-decoder.scm
 ;; TODO would be nicer if we didn't have to export flatten-array
 (define value->scm
   (make-parameter
-   (lambda (v)
-     (match v
-       (('array vs ...)
-        ;; (pretty-print (flatten-array vs))
-        (list->vector (map (value->scm) (flatten-array vs))))
-       ;; (format #f "array ~a" (flatten-array vs)))
+   (lambda (value-pair)
+     (match value-pair
+       (('array value-pairs ...)
+        (list->vector (map (value->scm) (flatten-array value-pairs))))
+       (('integer v)
+        (read-int v))
+       (('float v)
+        (if (or (string-contains v "nan") (string-contains v "inf"))
+            ;; guile doesn't have NaN or Inf types, not sure what to do here.
+            ;; Maybe #f for NaN?
+            (error "guile-toml: inf and nan are currently not supported")
+            (string->number v)))
+       (('string vs ...)
+        (read-string vs))
+       ('string
+        "")
+       (('bool v)
+        (equal? v "true"))
+       (('datetime v)
+        (display "guile-toml: datetimes are currently not supported\n")
+        v)
+       (('datetime-local v)
+        (display "guile-toml: datetimes are currently not supported\n")
+        v)
+       (('date-local v)
+        (display "guile-toml: datetimes are currently not supported\n")
+        v)
+       (('time-local v)
+        (display "guile-toml: datetimes are currently not supported\n")
+        v)
+
        ((x y)
-        ;; (single-value-proc x y)
-        ;; (annot-v-proc x y))
-        y)
-       ;; (format #f "type: ~a, value: ~a" x y))
+        (format #f "~a: ~a" x y))
        ('()
         '())
        ;; ('inline-table
        ;;  '())
-       (_ (error "err:" v))))))
+       (_ (error "err:" value-pair))))))
 
 ;; ((value->scm) '(x "2"))
 
@@ -114,4 +178,3 @@
     (if (null? (cdr tree))
         result
         (loop (cdr tree) result current-table inline-table-keys))))
-

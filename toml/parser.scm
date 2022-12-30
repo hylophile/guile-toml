@@ -1,5 +1,6 @@
 (define-module (toml parser)
   #:use-module (ice-9 peg)
+  #:use-module (ice-9 pretty-print)
   #:export (parse))
 
 ;; Built-in ABNF terms, reproduced here for clarity
@@ -29,7 +30,8 @@ wschar < ' ' / '\t'
 (define-peg-pattern non-ascii body
   (or (range #\x80 #\xD7FF) (range #\xE000 #\x10FFFF)))
 (define-peg-pattern non-eol body
-  (or "\t" (range #\x20 #\x7F) non-ascii))
+  ;; TODO report abnf is wrong here?
+  (or "\t" (range #\x20 #\x7E) non-ascii))
 
 (define-peg-string-patterns
   "comment-start-symbol <- '#'
@@ -71,7 +73,7 @@ basic-char <- basic-unescaped / escaped
 (define-peg-pattern basic-unescaped body
   (or body-wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
 (define-peg-string-patterns
-  "escaped <- escape escape-seq-char
+  "escaped <-- escape escape-seq-char
 
 escape <- '\\'
 ")
@@ -80,11 +82,11 @@ escape <- '\\'
   (or
    "\""
    "\\"
-   "\b"
-   "\f"
-   "\n"
-   "\r"
-   "\t"
+   "b"
+   "f"
+   "n"
+   "r"
+   "t"
    (and (range #\u #\u) HEXDIG HEXDIG HEXDIG HEXDIG)
    (and (range #\U #\U) HEXDIG HEXDIG HEXDIG HEXDIG HEXDIG HEXDIG HEXDIG HEXDIG)))
 
@@ -106,7 +108,11 @@ escape <- '\\'
 (define-peg-string-patterns
   "ml-basic-string <- ml-basic-string-delim t-newline? ml-basic-body ml-basic-string-delim
 ml-basic-string-delim <- quotation-mark quotation-mark quotation-mark
-ml-basic-body <- mlb-content* (mlb-quotes mlb-content+)* mlb-quotes?
+ml-basic-body <- mlb-content* (mlb-quotes mlb-content+)* mlb-quotes-end?
+
+mlb-quotes-end <- mlb-quotes-end-2 / mlb-quotes-end-1
+mlb-quotes-end-1 <- body-quot &ml-basic-string-delim
+mlb-quotes-end-2 <- body-quot body-quot &ml-basic-string-delim
 
 body-newline <- '\n' / '\r\n'
 body-ws <- body-wschar*
@@ -138,9 +144,13 @@ mlb-escaped-nl < escape ws body-newline (wschar / body-newline)*
 (define-peg-string-patterns
   "mll-quotes <- !ml-literal-string-delim body-apostrophe body-apostrophe?
 
+mll-quotes-end <- mll-quotes-end-2 / mll-quotes-end-1
+mll-quotes-end-1 <- body-apostrophe &ml-literal-string-delim
+mll-quotes-end-2 <- body-apostrophe body-apostrophe &ml-literal-string-delim
+
 ml-literal-string <- ml-literal-string-delim t-newline? ml-literal-body ml-literal-string-delim
 ml-literal-string-delim <- apostrophe apostrophe apostrophe
-ml-literal-body <- mll-content* (mll-quotes mll-content+ )* mll-quotes?
+ml-literal-body <- mll-content* (mll-quotes mll-content+ )* mll-quotes-end?
 
 mll-content <- mll-char / body-newline
 ")
@@ -152,7 +162,7 @@ mll-content <- mll-char / body-newline
   "integer <-- hex-int / oct-int / bin-int / dec-int
 
 minus <- '-'
-plus <- '+'
+plus < '+'
 underscore < '_'
 digit1-9 <- [1-9]
 digit0-7 <- [0-9]
@@ -165,9 +175,9 @@ bin-prefix <- '0b'
 dec-int <- (minus / plus)? unsigned-dec-int
 unsigned-dec-int <- (digit1-9 ( DIGIT / (underscore DIGIT))+) / DIGIT
 
-hex-int <-- hex-prefix HEXDIG (HEXDIG / underscore HEXDIG)*
-oct-int <-- oct-prefix digit0-7 (digit0-7 / underscore digit0-7)*
-bin-int <-- bin-prefix digit0-1 (digit0-1 / underscore digit0-1)*
+hex-int <- hex-prefix HEXDIG (HEXDIG / underscore HEXDIG)*
+oct-int <- oct-prefix digit0-7 (digit0-7 / underscore digit0-7)*
+bin-int <- bin-prefix digit0-1 (digit0-1 / underscore digit0-1)*
 ")
 ;; Float
 (define-peg-string-patterns
@@ -200,18 +210,18 @@ special-float <- ((minus / plus)? t-inf) / ((minus-none / plus-none)? t-nan)
 
 ;; Date and Time (as defined in RFC 3339)
 (define-peg-string-patterns
-  "date-time      <- offset-date-time / local-date-time / local-date / local-time
+  "date-time      <- datetime / datetime-local / date-local / time-local
 
 date-fullyear  <- DIGIT DIGIT DIGIT DIGIT
 date-month     <- DIGIT DIGIT
 date-mday      <- DIGIT DIGIT
-time-delim     <- 'T' / ' '
+time-delim     <- 'T' / 't' / ' '
 time-hour      <- DIGIT DIGIT
 time-minute    <- DIGIT DIGIT
 time-second    <- DIGIT DIGIT
 time-secfrac   <- '.' DIGIT+
 time-numoffset <- ( '+' / '-' ) time-hour ':' time-minute
-time-offset    <- 'Z' / time-numoffset
+time-offset    <- 'Z' / 'z' / time-numoffset
 
 partial-time   <- time-hour ':' time-minute ':' time-second time-secfrac?
 full-date      <- date-fullyear '-' date-month '-' date-mday
@@ -221,19 +231,19 @@ full-time      <- partial-time time-offset
 
 ;; Offset Date-Time
 (define-peg-string-patterns
-  "offset-date-time <-- full-date time-delim full-time
+  "datetime <-- full-date time-delim full-time
 ")
 ;; Local Date-Time
 (define-peg-string-patterns
-  "local-date-time <-- full-date time-delim partial-time
+  "datetime-local <-- full-date time-delim partial-time
 ")
 ;; Local Date
 (define-peg-string-patterns
-  "local-date <-- full-date
+  "date-local <-- full-date
 ")
 ;; Local Time
 (define-peg-string-patterns
-  "local-time <-- partial-time
+  "time-local <-- partial-time
 ")
 ;; Array
 ;; array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
@@ -284,5 +294,9 @@ array-table-close < ws ']]'
                   '(simple-key array keyval std-table inline-table)
                   (match-pattern toml str)))
   (if (eq? (string-length str) (peg:end record))
-      (peg:tree record)
-      (error "guile-toml: parsing failed")))
+      (begin
+        ;; (pretty-print (peg:tree record))
+        (peg:tree record))
+      (begin
+        (pretty-print (peg:tree record))
+        (error "guile-toml: parsing failed\n" (peg:substring record)))))
