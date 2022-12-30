@@ -35,9 +35,6 @@
        '())
       (_ (error "err: ~a" v)))))
 
-;; srfi-19
-;; (string->date "1987-08-03T18:28:12.234+08:00" "~Y-~m-~dT~H:~M:~S.~N~z")
-
 (define test-value?
   (lambda (expr)
     (and
@@ -46,11 +43,13 @@
       (vector? (cdr expr))
       (equal? (map car (cdr expr)) '("value" "type"))))))
 
+
+(set-port-conversion-strategy! (current-input-port) 'error)
+
 (define str (get-string-all (current-input-port)))
 
 (define scm (parameterize ((value->scm test-value->scm)
                            (value? test-value?))
               (toml->scm str)))
-;; (pretty-print scm)
 
 (define json (scm->json scm #:pretty #t #:unicode #t))
