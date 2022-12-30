@@ -91,6 +91,14 @@
   (newline port)
   (toml-build (cdr scm) port new-table))
 
+(define (values-then-array-tables a b)
+  (let ((av? (array-table? (cdr a)))
+        (bv? (array-table? (cdr b))))
+    (cond
+     ((and av? bv?) #t)
+     (av? #f)
+     (bv? #t))))
+
 (define (toml-build-tree scm port current-table)
   (define pairs scm)
   (unless (null? pairs)
@@ -98,7 +106,7 @@
         (partition value-pair? pairs)
       (for-each (lambda (kv)
                   (build-object-pair kv port current-table))
-                keyvals)
+                (sort keyvals values-then-array-tables))
       (for-each (lambda (t)
                   (build-table t port current-table))
                 tables))))
