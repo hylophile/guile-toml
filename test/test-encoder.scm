@@ -5,6 +5,7 @@
  (json)
  (srfi srfi-1)
  (ice-9 textual-ports)
+ (ice-9 match)
  (ice-9 pretty-print))
 
 (define test-value?
@@ -21,7 +22,13 @@
     (cdr (find (lambda (x) (equal? (car x) s)) lst)))
   (define type (find-cdr-by-car "type" scm))
   (define value (find-cdr-by-car "value" scm))
-  (put-string port value))
+  (match type
+    ("string"
+     (toml-build-string value port))
+    (_
+     (put-string port value))))
+;; ("integer")))
+
 
 (define* (test-toml-build-value scm port #:key (newline? #t) (inline? #t))
   (cond
@@ -34,7 +41,7 @@
 
 (define scm (json->scm (current-input-port)))
 
-(pretty-print scm)
+;; (pretty-print scm)
 ;; (test-value? '())
 
 ;;(value->scm test-value->scm)

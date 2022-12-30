@@ -4,7 +4,8 @@
   #:use-module (srfi srfi-19)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 receive)
-  #:export (scm->toml value? toml-build-value toml-build-array))
+  #:use-module (ice-9 string-fun)
+  #:export (scm->toml value? toml-build-value toml-build-array toml-build-string))
 
 (define-syntax-rule (log-exprs exp ...) (begin (format (current-error-port) "~a: ~S\n" (quote exp) exp) ...))
 
@@ -24,19 +25,40 @@
   (when newline?
     (newline port)))
 
-(define* (build-object-pair p port #:key (newline? #f) (inline? #f))
-  (put-string port (car p))
+(define* (build-object-pair p port #:key (newline? #t) (inline? #f))
+  ;; (put-string port (car p))
+  (build-key (car p) port)
   (put-string port " = ")
   (toml-build (cdr p) port #:newline? newline? #:inline? inline?))
 
+;; (define (escape-special c))
+
+
 (define (toml-build-string s port)
-  (put-string port "\"")
+  (define quote-type (if (or
+                          (string-contains s "\\")
+                          (string-contains s "\"")) #\' #\"))
+  (define surround (if (string-contains s "\n")
+                       (make-string 3 quote-type)
+                       (string quote-type)))
+  (put-string port surround)
   (put-string port s)
-  (put-string port "\""))
+  (put-string port surround))
 
 (define (build-keys lst port)
   ;; TODO unicode keys
-  (put-string port (string-join lst ".")))
+  ;; (put-string port (string-join lst "."))
+  ;; (toml-build-string (string-join lst ".") port))
+  (let loop ((lst lst))
+    (if (null? (cdr lst))
+        (build-key (car lst) port)
+        (begin
+          (build-key (car lst) port)
+          (put-string port ".")
+          (loop (cdr lst))))))
+
+(define (build-key s port)
+  (toml-build-string s port))
 
 (define (build-table scm port current-table)
   (define new-table (append current-table (list (car scm))))
@@ -48,11 +70,9 @@
 
 (define (toml-build-tree scm port current-table)
   (define pairs scm)
-  (log-exprs pairs)
   (unless (null? pairs)
     (receive (keyvals tables)
         (partition value-pair? pairs)
-      (log-exprs "-----------------" keyvals tables "--------------")
       (for-each (lambda (kv)
                   (build-object-pair kv port))
                 keyvals)
@@ -69,7 +89,6 @@
                (loop (cdr lst))))))
 
 (define (build-delimited-pairs lst port)
-  (log-exprs "a" lst (car lst))
   ( let loop ((lst lst))
     (if (null? (cdr lst))
         (build-object-pair (car lst) port #:newline? #f #:inline? #t)
@@ -78,7 +97,6 @@
                (loop (cdr lst))))))
 
 (define (toml-build-inline-tree scm port)
-  ;; (log-exprs scm)
   (define pairs scm)
   (put-string port "{")
   (unless (null? pairs)
@@ -113,14 +131,12 @@
 
 (define* (toml-build scm port #:optional (current-table '())
                      #:key (newline? #t) (inline? #f))
-  ;; (log-exprs "v" scm)
   (cond
    ;; ((eq? scm null) (toml-build-null port))
    ;; ((boolean? scm) (toml-build-boolean scm port))
    ;; ((toml-number? scm) (toml-build-number scm port))
    ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
    (((value?) scm)
-    (log-exprs "v" scm)
     ((toml-build-value) scm port #:newline? newline? #:inline? inline?))
    ((or (pair? scm) (null? scm))
     (if inline?
