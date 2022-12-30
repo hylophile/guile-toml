@@ -207,7 +207,8 @@
 (define (add-kv-to-tree tree keys value)
   ;; (pretty-print value)
   ;; (log-exprs tree keys value)
-  (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
+  (let ((k (and (not (null? keys))
+                (list-index (lambda (x) (equal? x (car keys))) (map car tree)))))
     (if k
         (let ((e (list-ref tree k)))
           (cond
@@ -227,6 +228,21 @@
                heads)
       (error "guile-toml: redefinition not allowed"))))
 
+(define (safe-drop lst k)
+  (match (false-if-exception (drop lst k))
+    (#f '())
+    (x x)))
+
+(define* (check-explicit-table-keys keylist explicit-table-keys #:optional (current-table-length 0))
+  (when (and (not (null? keylist))
+             (or
+              (member keylist explicit-table-keys)
+              (any (lambda (x) (member x explicit-table-keys)) (safe-drop (heads keylist) current-table-length))))
+    (error "guile-toml: redefinition not allowed")))
+
+;; (check-explicit-table-keys '("x") '(("x" "c" "s")) 2)
+(define (all-keys-but-last l) (reverse (cdr (reverse l))))
+
 (define (find-key tree keys)
   (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
     (cond
@@ -240,6 +256,7 @@
              (result '())
              (current-table '())
              (inline-table-keys '())
+             (explicit-table-keys '())
              (array-table-index #f))
     ;; (pretty-print tree)
     (match (car tree)
@@ -247,32 +264,51 @@
        (let ((keylist (append current-table (get-keys keys))))
          (set! inline-table-keys (cons keylist inline-table-keys))
          (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
+
       (('keyval keys ('inline-table keyvals ...))
-       (set! result
-             (loop (keyword-flatten '(keyval) keyvals)
-                   result
-                   (get-keys keys)
-                   '()
-                   array-table-index)))
+       (let* ((keylist (get-keys keys))
+              (keylist-all-but-last (all-keys-but-last keylist)))
+         (check-explicit-table-keys keylist-all-but-last explicit-table-keys)
+         (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys))
+         (set! result
+               (loop (keyword-flatten '(keyval) keyvals)
+                     result
+                     keylist
+                     '()
+                     '()
+                     array-table-index))))
+
       (('keyval ('simple-key value)) ;; special case for key being empty string
-       (let ((keylist (append current-table '(""))))
+       (let* ((keylist (append current-table '(""))))
          (check-inline-table-keys keylist inline-table-keys)
          (set! result (add-to-tree result current-table '("") (list value) array-table-index))))
+
       (('keyval keys value ...)
-       (let ((keylist (append current-table (get-keys keys))))
+       (let* ((keylist (append current-table (get-keys keys)))
+              (keylist-all-but-last (all-keys-but-last keylist)))
          (check-inline-table-keys keylist inline-table-keys)
+         (when (not (eq? 1 (length (get-keys keys))))
+           (log-exprs explicit-table-keys keylist-all-but-last)
+           (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
+           (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys)))
          (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
+
       (('std-table keys ...)
        (set! array-table-index #f)
        (let ((keylist (get-keys keys)))
          (check-inline-table-keys keylist inline-table-keys)
+         (check-explicit-table-keys keylist explicit-table-keys (length current-table))
+         (set! explicit-table-keys (cons keylist explicit-table-keys))
+         ;; (log-exprs explicit-table-keys)
          (unless (find-key result keylist)
            (set! result (add-to-tree result '() keylist '(()) array-table-index)))
          (set! current-table keylist)))
+
       (('array-table keys ...)
        (set! array-table-index 0)
        (let ((keylist (get-keys keys)))
          (check-inline-table-keys keylist inline-table-keys)
+         (check-explicit-table-keys keylist explicit-table-keys)
          (set! current-table keylist)
          (set! result (add-to-tree result current-table '() '() array-table-index))))
 
@@ -287,10 +323,11 @@
               result
               current-table
               inline-table-keys
+              explicit-table-keys
               array-table-index))))
 
 
-(define (add-array-tables tree keys)
-  (if (null? keys)
-      tree
-      (add-array-tables (add-to-tree tree) (cdr keys))))
+;; (define (add-array-tables tree keys)
+;;   (if (null? keys)
+;;       tree
+;;       (add-array-tables (add-to-tree ) (cdr keys))))
