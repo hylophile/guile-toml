@@ -309,41 +309,59 @@ array-table-close < ws ']]'
 ;; (display (peg:tree x))
 (define x (keyword-flatten '(simple-key array keyval std-table) (peg:tree (match-pattern toml t))))
 
+(define (flatten-array l)
+  (keyword-flatten '(array dec-int float string bola) l))
+
+
 (define (get-keys l)
   (map cadr (keyword-flatten '(simple-key) l)))
 
-(define (keys->string l)
-  (string-join (get-keys l) "."))
+;; (define (keys->string l)
+;;   (string-join (get-keys l) "."))
 
-(define (get-values l)
-  (match l
-    (('array vs ...) (keyword-flatten '(dec-int float string bola) l))
-    ((_ x) x)))
+;; (define (get-values l)
+;;   (match l
+;;     (('array vs ...) (keyword-flatten '(dec-int float string bola) vs))
+;;     ((_ x) x)))
 
-(get-values '(array (a b)))
+;; (get-values '(((a b) (c d)) (e f)))
 
-(define (values->string l)
-  (match (car l)
-    (('array vs ...) vs)
-    (x (cadr x))))
+;; (define (values->string l)
+;;   (match (car l)
+;;     (('array vs ...) vs)
+;;     (x (cadr x))))
 
-(define (value->string v)
-  (cdr v))
+;; (define (value->string v)
+;;   (cdr v))
+
+(define (single-value-proc x y)
+  y)
+
+(define (annot-v-proc x y)
+  `(("value" . ,y) ("type" . ,(symbol->string x))))
+
 
 (define (value->scm v)
-  ;; v)
-  (cadar v))
+  (match v
+    (('array vs ...)
+     (pretty-print (flatten-array vs))
+     (list->vector (map value->scm (flatten-array vs))))
+    ;; (format #f "array ~a" (flatten-array vs)))
+    ((x y)
+     (single-value-proc x y))
+    ;; (format #f "type: ~a, value: ~a" x y))
+    (_ (format #f "err: ~a" v))))
 
 (define (keyval->scm keys value)
   (let loop ((keys keys))
     (if (null? (cdr keys))
-        (cons (car keys) (value->scm value))
+        (cons (car keys) (value->scm (car value)))
         (list (car keys) (loop (cdr keys))))))
 
 
-(define tr '(("a" ("aa" . "v")) ("b" "c")))
+;; (define tr '(("a" ("aa" . "v")) ("b" "c")))
 
-(list-index (lambda (x) (equal? x "c")) (map car tr))
+;; (list-index (lambda (x) (equal? x "c")) (map car tr))
 
 (define (add-to-tree tree keys value)
   (if (null? keys)
@@ -396,7 +414,7 @@ array-table-close < ws ']]'
 ;;             tree))))))
 
 
-(receive (c d) (split-at '(a b) 1) (display c))
+;; (receive (c d) (split-at '(a b) 1) (display c))
 
 ;; (keyval->scm '(simple-key "a") '(string "a"))
 
@@ -412,16 +430,19 @@ array-table-close < ws ']]'
       ;; (display "\n"))
       ;; (format #t "~a = ~S\n" (keys->string keys) (values->string values)))
       (('std-table keys ...)
-       (format #t "[~a]\n" (keys->string keys))
+       ;; (format #t "[~a]\n" (keys->string keys))
        (set! current-table (get-keys keys)))
-      ((x ...) (display x)))
+      ((x ...) (display "WTF")(display x)))
 
     (if (null? (cdr tree))
         result
         (loop (cdr tree) result current-table))))
 
+;; (let ((single-value-proc annot-v-proc
+;;                 (b))))
 
-(pretty-print (b))
+(pretty-print (let ((single-value-proc annot-v-proc))
+                (b)))
 
 (display "\n\n\n")
 
