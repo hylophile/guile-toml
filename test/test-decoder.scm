@@ -1,6 +1,11 @@
 #!/usr/bin/env -S guile -s
 !#
-(use-modules (json) (toml) (ice-9 match) (ice-9 textual-ports) (ice-9 pretty-print))
+(use-modules
+ (toml parser)
+ (json)
+ (ice-9 match)
+ (ice-9 textual-ports)
+ (ice-9 pretty-print))
 
 (define test-value->scm
   (lambda (v)
