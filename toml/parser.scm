@@ -51,7 +51,7 @@ dot-sep   <- ws dot ws
 dot < '.'
 keyval-sep <- ws eq ws
 eq < '='
-val <- string / boolean / array / inline-table / date-time / float / integer
+val <- string / bool / array / inline-table / date-time / float / integer
 
 ")
 ;; String
@@ -71,7 +71,7 @@ basic-char <- basic-unescaped / escaped
 (define-peg-pattern basic-unescaped body
   (or body-wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
 (define-peg-string-patterns
-  "escaped <-- escape escape-seq-char
+  "escaped <- escape escape-seq-char
 
 escape <- '\\'
 ")
@@ -182,13 +182,17 @@ zero-prefixable-int <- DIGIT (DIGIT / underscore DIGIT)*
 t-exp <- [eE] float-t-exp-part
 float-t-exp-part <- (minus / plus)? zero-prefixable-int
 
-special-float <-- (minus / plus)? ( t-inf / t-nan)
-t-inf <- 'inf'
+minus-none < '-'
+plus-none < '+'
 t-nan <- 'nan'
+t-inf <- 'inf'
+
+special-float <- ((minus / plus)? t-inf) / ((minus-none / plus-none)? t-nan)
+
 ")
 ;; Boolean
 (define-peg-string-patterns
-  "boolean <-- 'true' / 'false'
+  "bool <-- 'true' / 'false'
 
 ")
 ;; true    <- %x74.72.75.65     ; true
@@ -258,7 +262,7 @@ std-table-close < ws ']'
 ")
 ;; Inline Table
 (define-peg-string-patterns
-  "inline-table <- inline-table-open inline-table-keyvals? inline-table-close
+  "inline-table <-- inline-table-open inline-table-keyvals? inline-table-close
 
 inline-table-open  < '{' ws
 inline-table-close < ws '}'
@@ -276,4 +280,9 @@ array-table-close < ws ']]'
 
 
 (define (parse str)
-  (peg:tree (match-pattern toml str)))
+  (define record (keyword-flatten
+                  '(simple-key array keyval std-table inline-table)
+                  (match-pattern toml str)))
+  (if (eq? (string-length str) (peg:end record))
+      (peg:tree record)
+      (error "guile-toml: parsing failed")))

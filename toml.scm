@@ -1,7 +1,6 @@
 (define-module (toml)
   #:use-module (toml parser)
   #:use-module (ice-9 peg)
-  ;; #:use-module (ice-9 receive)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 pretty-print)
   #:use-module (ice-9 match)
@@ -10,60 +9,13 @@
   #:export (toml->scm))
 
 
-;; (define (a)
-;;   (let loop ((tree x))
-;;     (match (car tree)
-;;       (('keyval keys values ...)
-;;        (format #t "~a = ~S\n" (keys->string keys) (values->string values)))
-;;       (('std-table keys ...)
-;;        (format #t "[~a]\n" (keys->string keys)))
-;;       ((x ...) (display x)))
-
-;;     (unless (null? (cdr tree))
-;;       (loop (cdr tree)))))
-
-
-
-(define (read-from-file file)
-  (call-with-input-file file get-string-all))
-
-(define t (read-from-file "spec-example-1-compact.toml"))
-
-;; (define (parse s)
-;;   (peg:tree (match-pattern toml s)))
-
-;; (define x (match-pattern toml t))
-;; (pretty-print (keyword-flatten '(simple-key array keyval std-table) (peg:tree x)))
-
-;; (display "\n\n")
-
-;; (display (peg:tree x))
-;; (define x (keyword-flatten '(simple-key array keyval std-table) (peg:tree (match-pattern toml t))))
+(define-syntax-rule (log-exprs exp ...) (begin (format #t "~a: ~S\n" (quote exp) exp) ...))
 
 (define (flatten-array l)
   (keyword-flatten '(array dec-int float string bola) l))
 
-
 (define (get-keys l)
   (map cadr (keyword-flatten '(simple-key) l)))
-
-;; (define (keys->string l)
-;;   (string-join (get-keys l) "."))
-
-;; (define (get-values l)
-;;   (match l
-;;     (('array vs ...) (keyword-flatten '(dec-int float string bola) vs))
-;;     ((_ x) x)))
-
-;; (get-values '(((a b) (c d)) (e f)))
-
-;; (define (values->string l)
-;;   (match (car l)
-;;     (('array vs ...) vs)
-;;     (x (cadr x))))
-
-;; (define (value->string v)
-;;   (cdr v))
 
 (define (single-value-proc x y)
   y)
@@ -82,7 +34,11 @@
      ;; (single-value-proc x y)
      (annot-v-proc x y))
     ;; (format #f "type: ~a, value: ~a" x y))
-    (_ (format #f "err: ~a" v))))
+    ('()
+     '())
+    ;; ('inline-table
+    ;;  '())
+    (_ (error "err: ~a" v))))
 
 (define (keyval->scm keys value)
   (let loop ((keys keys))
@@ -90,19 +46,26 @@
         (cons (car keys) (value->scm (car value)))
         (list (car keys) (loop (cdr keys))))))
 
-
 ;; (define tr '(("a" ("aa" . "v")) ("b" "c")))
+(define (value? expr)
+  (list? expr))
 
+(define (test-value? expr)
+  (and
+   (string? (car expr))
+   (equal? (map car (cdr expr)) '("value" "type"))))
 ;; (list-index (lambda (x) (equal? x "c")) (map car tr))
 
 (define (add-to-tree tree keys value)
+  ;; (pretty-print value)
   (if (null? keys)
       ;; TODO helper to never call this on top-level
       (value->scm value)
-      (let* ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
+      (let ((k (list-index (lambda (x) (equal? x (car keys))) (map car tree))))
         (if k
             (let ((e (list-ref tree k)))
-              (unless (list? e)
+              ;; (pretty-print e)
+              (when (test-value? e)
                 (error "guile-toml: redefinition not allowed"))
               (append
                (take tree k)
@@ -110,88 +73,53 @@
                       (car e)
                       (add-to-tree (cdr e) (cdr keys) value)))
                (drop tree (1+ k))))
-            ;; (receive (a b) (split-at tree k)
-            ;;   (display a)
-            ;;   (newline)
-            ;;   (display b)
-            ;;   (newline)
-            ;;   (display (cdr b))
-            ;;   (newline)
-            ;;   (newline)
-            ;;   (if (list? (car b))
-
-            ;;       ;; (append a
-            ;;       ;;         (cons
-            ;;       ;;          (caar b)
-            ;;       ;;          (add-to-tree (cdar b) (cdr keys) value))
-            ;;       ;;         (cdr b))
-            ;;       (error "redefinition")))
             (cons (keyval->scm keys value) tree)))))
 
-;; (add-to-tree '(("a" ("e" . "hi")) ("b" . 3)) '("a" "e") "c")
+(define (heads lst)
+  (map (lambda (k) (list-head lst k)) (iota (length lst) 1)))
 
-;; (add-to-tree '(("z")("a")) '("a") "c")
-;; (add-to-tree '() '("a") "c")
-
-;; (map car '(("a" . "d")))
-
-;; (define x '(1 2 3 4))
-;; (define n 2)
-;; (append (take x n) (list (list-ref x n)) (drop x (1+ n)))
-
-
-;; (json-string->scm "{\"b\": {\"e\":\"c\"}}")
-;; (json-string->scm "{\"b\": {}}")
-;; (list-set! tree k (add-to-tree (list-ref tree k) (cdr keys) value)
-;;             tree))))))
-
-
-;; (receive (c d) (split-at '(a b) 1) (display c))
-
-;; (keyval->scm '(simple-key "a") '(string "a"))
-
-;; TODO error if parsing not at end of input
+(define (check-inline-table-keys keylist inline-table-keys)
+  (let ((heads (map (lambda (k) (list-head keylist k))
+                    (iota (length keylist) 1))))
+    (when (any (lambda (x) (member x inline-table-keys))
+               heads)
+      (error "guile-toml: redefinition not allowed"))))
 
 (define (toml->scm s)
-  ;; (display s)
-  (let loop ((tree (keyword-flatten
-                    '(simple-key array keyval std-table)
-                    (parse s)))
+  (define tree (parse s))
+  (let loop ((tree (if (symbol? (car tree)) (list tree) tree))
              (result '())
-             (current-table '()))
+             (current-table '())
+             (inline-table-keys '()))
+    ;; (pretty-print tree)
     (match (car tree)
+      (('keyval keys 'inline-table)
+       (let ((keylist (append current-table (get-keys keys))))
+         (set! inline-table-keys (cons keylist inline-table-keys))
+         (set! result (add-to-tree result keylist '(())))))
+      (('keyval keys ('inline-table keyvals ...))
+       (set! result
+             (loop (keyword-flatten '(keyval) keyvals)
+                   result
+                   (get-keys keys)
+                   '())))
       (('keyval keys value ...)
-       ;; (pretty-print (keyval->scm (append current-table (get-keys keys)) value))
-       (set! result (add-to-tree result (append current-table (get-keys keys)) value)))
-      ;; (pretty-print (get-keys keys))
-      ;; (pretty-print keys)
-      ;; (pretty-print value))
-      ;; (display "\n"))
-      ;; (format #t "~a = ~S\n" (keys->string keys) (values->string values)))
+       (let ((keylist (append current-table (get-keys keys))))
+         (check-inline-table-keys keylist inline-table-keys)
+         (set! result (add-to-tree result keylist value))))
       (('std-table keys ...)
-       ;; (format #t "[~a]\n" (keys->string keys))
-       (set! current-table (get-keys keys)))
-      ((x ...) (display "WTF")(display x)))
+       (let ((keylist (get-keys keys)))
+         (check-inline-table-keys keylist inline-table-keys)
+         (set! result (add-to-tree result keylist '(())))
+         (set! current-table keylist)))
+
+      (x (format #t "~a ; unknown: ~a\n" tree x)))
 
     (if (null? (cdr tree))
         result
-        (loop (cdr tree) result current-table))))
+        (loop (cdr tree) result current-table inline-table-keys))))
 
-;; (let ((single-value-proc annot-v-proc
-;;                 (toml->scm))))
 
-;; (pretty-print (let ((single-value-proc annot-v-proc))
-;;                 (toml->scm)))
-
-;; (display "\n\n\n")
-;; (toml->scm "[k]\na.b.c=2")
-;; (toml->scm "[k]")
-;; (display (scm->json (toml->scm (get-string-all (current-input-port)))))
-;; (newline)
-
-;; (pretty-print (json-string->scm (call-with-input-file "spec-example-1-compact.json" get-string-all)))
-
-;; (display (scm->json (peg:tree x)))
-;; (pretty-print (peg:substring x))
-;; (keyword-flatten '(simple-key) '((simple-key hosts) ((simple-key l) (simple-key ol))))
-;; (keyword-flatten '(simple-key) '(simple-key hosts))
+;; (toml->scm "a={}\n[a]")
+;; (parse "a=2")
+;; (parse "[a]")
