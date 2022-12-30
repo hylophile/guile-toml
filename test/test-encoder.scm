@@ -1,16 +1,23 @@
 #!/usr/bin/env -S guile -s
 !#
 (use-modules
- (toml parser)
- (json)
- (ice-9 match)
- (ice-9 textual-ports)
- (ice-9 pretty-print))
+ (toml builder)
+ (json))
+
+(define test-value?
+  (lambda (expr)
+    (and
+     (string? (car expr)))
+    (or
+     (vector? (cdr expr))
+     (equal? (map car (cdr expr)) '("value" "type")))))
 
 (set-port-conversion-strategy! (current-input-port) 'error)
 
-;; (define str (get-string-all (current-input-port)))
-
 (define scm (json->scm (current-input-port)))
 
-(display scm)
+
+;;(value->scm test-value->scm)
+(define x (parameterize ((value? test-value?))
+            (scm->toml scm)))
+;; (scm->toml scm)
