@@ -226,7 +226,8 @@
                     (iota (length keylist) 1))))
     (when (any (lambda (x) (member x inline-table-keys))
                heads)
-      (error "guile-toml: redefinition not allowed"))))
+      (begin
+        (error "guile-toml: redefinition not allowed")))))
 
 (define (safe-drop lst k)
   (match (false-if-exception (drop lst k))
@@ -238,7 +239,15 @@
              (or
               (member keylist explicit-table-keys)
               (any (lambda (x) (member x explicit-table-keys)) (safe-drop (heads keylist) current-table-length))))
-    (error "guile-toml: redefinition not allowed")))
+    (error "guile-toml: redefinition not allowed" keylist explicit-table-keys current-table-length)))
+
+(define* (check-explicit-table-keys keylist explicit-table-keys #:optional (current-table-length 0))
+  ;; (log-exprs keylist explicit-table-keys current-table-length "____")
+  (when (and (not (null? keylist))
+             (or
+              (member keylist explicit-table-keys)
+              (any (lambda (x) (member x explicit-table-keys)) (safe-drop (heads keylist) current-table-length))))
+    (error "guile-toml: redefinition not allowed" keylist explicit-table-keys current-table-length)))
 
 ;; (check-explicit-table-keys '("x") '(("x" "c" "s")) 2)
 (define (all-keys-but-last l) (reverse (cdr (reverse l))))
@@ -257,6 +266,7 @@
              (current-table '())
              (inline-table-keys '())
              (explicit-table-keys '())
+             (new-explicit-table-keys '())
              (array-table-index #f))
     ;; (pretty-print tree)
     (match (car tree)
@@ -266,14 +276,16 @@
          (set! result (add-to-tree result current-table (get-keys keys) '(()) array-table-index))))
 
       (('keyval keys ('inline-table keyvals ...))
-       (let* ((keylist (get-keys keys))
+       (let* ((keylist (append current-table (get-keys keys)))
               (keylist-all-but-last (all-keys-but-last keylist)))
-         (check-explicit-table-keys keylist-all-but-last explicit-table-keys)
-         (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys))
+         (when (not (eq? 1 (length (get-keys keys))))
+           (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
+           (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys)))
          (set! result
                (loop (keyword-flatten '(keyval) keyvals)
                      result
                      keylist
+                     '()
                      '()
                      '()
                      array-table-index))))
@@ -288,14 +300,16 @@
               (keylist-all-but-last (all-keys-but-last keylist)))
          (check-inline-table-keys keylist inline-table-keys)
          (when (not (eq? 1 (length (get-keys keys))))
-           (log-exprs explicit-table-keys keylist-all-but-last)
+           ;; (log-exprs explicit-table-keys keylist-all-but-last)
            (check-explicit-table-keys keylist-all-but-last explicit-table-keys (length current-table))
-           (set! explicit-table-keys (cons keylist-all-but-last explicit-table-keys)))
+           (set! new-explicit-table-keys (cons keylist-all-but-last new-explicit-table-keys)))
          (set! result (add-to-tree result current-table (get-keys keys) value array-table-index))))
 
       (('std-table keys ...)
        (set! array-table-index #f)
        (let ((keylist (get-keys keys)))
+         (set! explicit-table-keys (append new-explicit-table-keys explicit-table-keys))
+         (set! new-explicit-table-keys '())
          (check-inline-table-keys keylist inline-table-keys)
          (check-explicit-table-keys keylist explicit-table-keys (length current-table))
          (set! explicit-table-keys (cons keylist explicit-table-keys))
@@ -324,6 +338,7 @@
               current-table
               inline-table-keys
               explicit-table-keys
+              new-explicit-table-keys
               array-table-index))))
 
 
