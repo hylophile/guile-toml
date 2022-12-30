@@ -1,3 +1,4 @@
 (define-module (toml)
   #:use-module (toml parser)
-  #:re-export (toml->scm))
+  #:use-module (toml builder)
+  #:re-export (toml->scm scm->toml))
