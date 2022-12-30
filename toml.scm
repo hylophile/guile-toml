@@ -52,9 +52,15 @@ NL < '\n'")
 
 ;; (parse "x = [ 8000, 8002 ]")
 
-;; (search-for-pattern "'\"' .*" "\"aaaa\"")
+;; (define-peg-string-patterns "yyy <- [a-z]")
+
+(define-peg-pattern rrr all (range #\x20 #\x80))
+
+(search-for-pattern "'a'" "a ")
 
 (pretty-print (parse t))
+
+(peg:tree (match-pattern rrr "  "))
 
 ;; (pretty-print (peg:substring (match-pattern toml t)))
 ;; (display t)
