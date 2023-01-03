@@ -6,29 +6,32 @@ TOML for Guile; v1.0.0 compliant.
 
 ** Installation
 
-For now: add this folder to ~GUILE_LOAD_PATH~
+For now: add this folder to your ~GUILE_LOAD_PATH~.
 
 ** Usage
 
 When parsing and building TOML documents, guile-toml follows [[https://github.com/aconchillo/guile-json][guile-json]] as close as possible. TOML types correspond to Guile types according to the following table:
 
-| TOML           | Guile            |
-|----------------+------------------|
-| string         | string [0]        |
-| key-value pair | alist            |
-| array          | vector           |
-| integer/float  | real             |
-| true           | #t               |
-| false          | #f               |
-| datetime       | SRFI-19 date [1] |
-| nan            | +nan.0           |
-| ±inf           | ±inf.0            |
+| TOML           | Guile               |
+|----------------+---------------------|
+| string         | string [fn:0]       |
+| key-value pair | alist               |
+| array          | vector              |
+| integer/float  | real                |
+| true           | #t                  |
+| false          | #f                  |
+| datetime       | SRFI-19 date [fn:1] |
+| nan            | +nan.0              |
+| ±inf           | ±inf.0              |
 
-To start using guile-toml: ~(use-modules (toml))~
+To start using guile-toml:
+#+begin_src scheme
+(use-modules (toml))
+#+end_src
 
-[0]: TOML's default behaviour for invalid UTF-8 is to fail, whereas [[https://www.gnu.org/software/guile/manual/html_node/Encoding.html][Guile's default behavior]] is to replace invalid UTF-8 with �. If you prefer TOML's behavior, use ~(set-port-conversion-strategy! (current-input-port) 'error)~.
+[fn:0] TOML's default behaviour for invalid UTF-8 is to fail, whereas [[https://www.gnu.org/software/guile/manual/html_node/Encoding.html][Guile's default behavior]] is to replace invalid UTF-8 with �. If you prefer TOML's behavior, use ~(set-port-conversion-strategy! (current-input-port) 'error)~.
 
-[1]: TOML's ~time-local~ is parsed same as a ~datetime-local~ on the date of ~1970-01-01~.
+[fn:1] TOML's ~time-local~ is parsed same as a ~datetime-local~ on the date of ~1970-01-01~.
 
 *** Reading TOML documents
 
@@ -51,7 +54,7 @@ To start using guile-toml: ~(use-modules (toml))~
 (("a" ("b" ("c" . "hi world"))))
 #+end_src
 
-- Read a TOML file and parse it (example[2] from [[https://toml.io][toml.io]]):
+- Read a TOML file and parse it (example[fn:2] from [[https://toml.io][toml.io]]):
 #+begin_src scheme
 > (use-modules (toml) (ice-9 textual-ports))
 > (toml->scm (call-with-input-file "example.toml" get-string-all))
@@ -76,7 +79,7 @@ To start using guile-toml: ~(use-modules (toml))~
  ("title" . "TOML Example"))
  #+end_src
 
- [2]:
+ [fn:2]
 #+begin_src toml
 # This is a TOML document
 
