@@ -20,8 +20,8 @@ $ toml-test -encoder ./test-encoder.scm
 The ~toml-test~ suite tests TOML's structure extensively, but since it relies on JSON and a different encoding of values, we still need to test whether Guile's datatypes are decoded and encoded correctly.
 
 To run the tests for the decoder:
-#+begin_src scheme
-guile test-datatypes.scm
+#+begin_src shell
+$ guile test-datatypes.scm
 #+end_src
 
 The files ~decoder.scm~ and ~encoder.scm~ serve as manual testing utilities:
