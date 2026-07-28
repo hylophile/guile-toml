@@ -249,7 +249,7 @@ full-time      <- partial-time time-offset
 ;; array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
 ;; array-values <- (ws-comment-t-newline val ws-comment-t-newline array-sep)* ws-comment-t-newline val ws-comment-t-newline array-sep?
 (define-peg-string-patterns
-  "array <-- array-open array-values? ws-comment-t-newline array-close
+  "array <-- array-open (array-values / empty) ws-comment-t-newline array-close
 
 array-open < '['
 array-close < ']'

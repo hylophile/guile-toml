@@ -55,6 +55,9 @@
    (lambda (value-pair)
      ;; (log-exprs value-pair)
      (match value-pair
+       ;; Empty [] -> (array empty).
+       (('array 'empty)
+        (list->vector '()))
        (('array value-pairs ...)
         ;; (log-exprs value-pairs (flatten-array value-pairs))
         ;; (pretty-print value-pairs)

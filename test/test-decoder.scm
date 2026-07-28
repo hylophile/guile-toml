@@ -10,6 +10,9 @@
 (define test-value->scm
   (lambda (v)
     (match v
+      ;; Empty [] -> (array empty).
+      (('array 'empty)
+       (list->vector '()))
       (('array vs ...)
        (list->vector (map test-value->scm (flatten-array vs))))
       (('string ys ...)
