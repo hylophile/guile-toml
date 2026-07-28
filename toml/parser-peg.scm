@@ -72,10 +72,10 @@ basic-char <- basic-unescaped / escaped
 ;; basic-unescaped <- wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 (define-peg-pattern basic-unescaped body
   (or body-wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
+(define-peg-pattern escape body "\\")
+
 (define-peg-string-patterns
   "escaped <-- escape escape-seq-char
-
-escape <- '\\'
 ")
 
 (define-peg-pattern escape-seq-char body
@@ -249,7 +249,7 @@ full-time      <- partial-time time-offset
 ;; array-values <- ws-comment-t-newline val ws-comment-t-newline array-sep array-values / ws-comment-t-newline val ws-comment-t-newline array-sep?
 ;; array-values <- (ws-comment-t-newline val ws-comment-t-newline array-sep)* ws-comment-t-newline val ws-comment-t-newline array-sep?
 (define-peg-string-patterns
-  "array <-- array-open array-values? ws-comment-t-newline array-close
+  "array <-- array-open (array-values / empty) ws-comment-t-newline array-close
 
 array-open < '['
 array-close < ']'
@@ -274,10 +274,10 @@ std-table-open  < '[' ws
 std-table-close < ws ']'
 ")
 ;; Inline Table
+(define-peg-pattern empty all (and))
 (define-peg-string-patterns
   "inline-table <-- inline-table-open (inline-table-keyvals / empty) inline-table-close
 
-empty <- ''
 inline-table-open  < '{' ws
 inline-table-close < ws '}'
 inline-table-sep   < ws ',' ws

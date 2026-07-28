@@ -10,6 +10,9 @@
 (define test-value->scm
   (lambda (v)
     (match v
+      ;; Empty [] -> (array empty).
+      (('array 'empty)
+       (list->vector '()))
       (('array vs ...)
        (list->vector (map test-value->scm (flatten-array vs))))
       (('string ys ...)
@@ -30,7 +33,7 @@
       (('time-local v)
        (validate-date-time `(time-local ,v))
        `(("value" . ,v) ("type" . "time-local")))
-      (('inline-table "")
+      (('inline-table 'empty)
        '())
       (('inline-table xs ...)
        (peg-tree->scm (flatten-tree xs)))

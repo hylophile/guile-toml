@@ -55,6 +55,9 @@
    (lambda (value-pair)
      ;; (log-exprs value-pair)
      (match value-pair
+       ;; Empty [] -> (array empty).
+       (('array 'empty)
+        (list->vector '()))
        (('array value-pairs ...)
         ;; (log-exprs value-pairs (flatten-array value-pairs))
         ;; (pretty-print value-pairs)
@@ -88,7 +91,7 @@
        (('time-local v)
         (validate-date-time `(time-local ,v))
         (time-local->date v))
-       (('inline-table "")
+       (('inline-table 'empty)
         '())
        (('inline-table xs ...)
         (peg-tree->scm (flatten-tree xs)))
@@ -98,8 +101,6 @@
         '())
        ('(())
         (error "redef"))
-       ;; ('inline-table
-       ;;  '())
        (_ (error "err:" value-pair))))))
 
 (define (normalize-date-time s)
