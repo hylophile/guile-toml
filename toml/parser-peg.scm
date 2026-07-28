@@ -274,10 +274,10 @@ std-table-open  < '[' ws
 std-table-close < ws ']'
 ")
 ;; Inline Table
+(define-peg-pattern empty all (and))
 (define-peg-string-patterns
   "inline-table <-- inline-table-open (inline-table-keyvals / empty) inline-table-close
 
-empty <- ''
 inline-table-open  < '{' ws
 inline-table-close < ws '}'
 inline-table-sep   < ws ',' ws

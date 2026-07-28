@@ -30,7 +30,7 @@
       (('time-local v)
        (validate-date-time `(time-local ,v))
        `(("value" . ,v) ("type" . "time-local")))
-      (('inline-table "")
+      (('inline-table 'empty)
        '())
       (('inline-table xs ...)
        (peg-tree->scm (flatten-tree xs)))
