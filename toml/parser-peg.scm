@@ -72,10 +72,10 @@ basic-char <- basic-unescaped / escaped
 ;; basic-unescaped <- wschar / %x21 / %x23-5B / %x5D-7E / non-ascii
 (define-peg-pattern basic-unescaped body
   (or body-wschar (range #\x21 #\x21) (range #\x23 #\x5B) (range #\x5D #\x7E) non-ascii))
+(define-peg-pattern escape body "\\")
+
 (define-peg-string-patterns
   "escaped <-- escape escape-seq-char
-
-escape <- '\\'
 ")
 
 (define-peg-pattern escape-seq-char body
