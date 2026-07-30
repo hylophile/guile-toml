@@ -1,6 +1,5 @@
 (define-module (toml builder)
   #:use-module (srfi srfi-1)
-  #:use-module (json)
   #:use-module (srfi srfi-19)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 receive)

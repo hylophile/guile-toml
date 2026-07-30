@@ -6,7 +6,6 @@
   #:use-module (ice-9 match)
   #:use-module (ice-9 regex)
   #:use-module (srfi srfi-19)
-  #:use-module (json)
   #:use-module (srfi srfi-1)
   #:export (toml->scm peg-tree->scm flatten-tree flatten-array value->scm validate-date-time read-string read-int value?))
 
