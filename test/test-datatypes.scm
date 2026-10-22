@@ -38,3 +38,17 @@
 (test-equal scm-false '(("false" . #f)))
 
 (test-end "decoder-datatypes-test")
+
+(test-begin "encoder-datatypes-test")
+
+(define (round-trip scm)
+  (toml->scm (with-output-to-string (lambda () (scm->toml scm)))))
+
+(test-equal (round-trip '(("true" . #t))) '(("true" . #t)))
+(test-equal (round-trip '(("false" . #f))) '(("false" . #f)))
+(test-equal (round-trip '(("nan" . +nan.0))) '(("nan" . +nan.0)))
+(test-equal (round-trip '(("inf" . +inf.0))) '(("inf" . +inf.0)))
+(test-equal (round-trip '(("negative-inf" . -inf.0)))
+  '(("negative-inf" . -inf.0)))
+
+(test-end "encoder-datatypes-test")
