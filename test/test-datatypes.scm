@@ -38,3 +38,20 @@
 (test-equal scm-false '(("false" . #f)))
 
 (test-end "decoder-datatypes-test")
+
+(test-begin "encoder-datatypes-test")
+
+(define (round-trip scm)
+  (toml->scm (with-output-to-string (lambda () (scm->toml scm)))))
+
+(test-equal (round-trip '(("empty-array" . #()))) '(("empty-array" . #())))
+(test-equal (round-trip '(("empty-table"))) '(("empty-table")))
+(test-equal (round-trip '(("quotes" . "a\"b'c\\d"))) '(("quotes" . "a\"b'c\\d")))
+(test-equal (round-trip '(("control" . "a\"\x01;b\tc\x7f;")))
+  '(("control" . "a\"\x01;b\tc\x7f;")))
+(test-equal (round-trip '(("newline" . "\nfirst\nsecond")))
+  '(("newline" . "\nfirst\nsecond")))
+(test-equal (round-trip '(("key \"with\" 'quotes'\\" . 1)))
+  '(("key \"with\" 'quotes'\\" . 1)))
+
+(test-end "encoder-datatypes-test")
