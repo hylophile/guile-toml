@@ -23,7 +23,9 @@
       (array-table? (cdr scm))))
 
 (define (array-table? v)
-  (and (vector? v) (not (any (value?) (vector->list v)))))
+  (and (vector? v)
+       (not (zero? (vector-length v)))
+       (not (any (value?) (vector->list v)))))
 
 (define (array-table-pair? scm)
   (array-table? (cdr scm)))
@@ -59,40 +61,28 @@
   (put-string port " = ")
   (toml-build (cdr p) port #:newline? newline? #:inline? inline?))
 
-(define* (escape-control-characters s #:optional (literal-nl? #f))
+(define (escape-control-characters s)
   (define (char->unicode-hex c)
     (define hex-unpadded (number->string (char->integer c) 16))
     (define zeroes (make-string (- 4 (string-length hex-unpadded)) #\0))
     (string-append "\\u" zeroes hex-unpadded))
   (apply string-append (map (lambda (c)
                               (cond
-                               ((and literal-nl? (eq? c #\newline))
-                                "\n")
                                ((eq? 'Cc (char-general-category c))
                                 (char->unicode-hex c))
                                (else (string c))))
                             (string->list s))))
 
 (define (toml-build-string s port)
-  (define quote-type (if (or
-                          (string-contains s "\\")
-                          (string-contains s "\"")) #\' #\"))
-  (define surround (if (string-contains s "\n")
-                       (make-string 3 quote-type)
-                       (string quote-type)))
-  ;; (define surround (make-string 1 quote-type))
-  (put-string port surround)
-  (put-string port (escape-control-characters s #t))
-  (put-string port surround))
+  (put-string port "\"")
+  (put-string port (escape-control-characters
+                    (string-replace-substring
+                     (string-replace-substring s "\\" "\\\\")
+                     "\"" "\\\"")))
+  (put-string port "\""))
 
 (define (toml-build-key-string s port)
-  (define quote-type (if (or
-                          (string-contains s "\\")
-                          (string-contains s "\"")) #\' #\"))
-  (define surround (make-string 1 quote-type))
-  (put-string port surround)
-  (put-string port (escape-control-characters s))
-  (put-string port surround))
+  (toml-build-string s port))
 
 (define (build-keys lst port)
   ;; TODO unicode keys
