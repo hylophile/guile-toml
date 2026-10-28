@@ -53,5 +53,11 @@
   '(("newline" . "\nfirst\nsecond")))
 (test-equal (round-trip '(("key \"with\" 'quotes'\\" . 1)))
   '(("key \"with\" 'quotes'\\" . 1)))
+(test-equal (round-trip '(("true" . #t))) '(("true" . #t)))
+(test-equal (round-trip '(("false" . #f))) '(("false" . #f)))
+(test-equal (round-trip '(("nan" . +nan.0))) '(("nan" . +nan.0)))
+(test-equal (round-trip '(("inf" . +inf.0))) '(("inf" . +inf.0)))
+(test-equal (round-trip '(("negative-inf" . -inf.0)))
+  '(("negative-inf" . -inf.0)))
 
 (test-end "encoder-datatypes-test")
