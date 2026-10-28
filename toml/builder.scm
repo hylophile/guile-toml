@@ -197,10 +197,11 @@
        (scm port #:key (newline? #t) (inline? #f))
      (cond
       ;; ((eq? scm null) (toml-build-null port))
-      ;; ((boolean? scm) (toml-build-boolean scm port))
+      ((boolean? scm) (put-string port (if scm "true" "false")))
       ;; ((symbol? scm) (toml-build-string (symbol->string scm) port))
 
-      ;; TODO float (nan, inf)
+      ((and (real? scm) (nan? scm)) (put-string port "nan"))
+      ((and (real? scm) (inf? scm)) (put-string port (if (positive? scm) "inf" "-inf")))
       ((date? scm) (put-string port (date->toml-datetime scm)))
       ((vector? scm) (toml-build-array scm port))
       ((string? scm) (toml-build-string scm port))
